@@ -7930,7 +7930,6 @@ out:
 
 	//	//cpc->trim_start = trim_start;
 	//}
-
 	
 	up_write(&sit_i->sentry_lock);
 #ifdef MIGRATION_HANDLING_LATENCY
@@ -7940,38 +7939,17 @@ out:
 
 	struct free_segmap_info *free_i = FREE_I(sbi);
 
-//#ifdef PRINT_FREE_SEC
-//	spin_lock(&free_i->segmap_lock);
-//	printk("%s: sec util: data: %lu / %lu %lu per node: %lu / %lu %lu per", 
-//			__func__, 
-//			MAIN_SECS_INTERVAL(sbi) - free_i->free_sections, 
-//			MAIN_SECS_INTERVAL(sbi), 
-//			100 * (MAIN_SECS_INTERVAL(sbi) - free_i->free_sections) / MAIN_SECS_INTERVAL(sbi), 
-//			MAIN_SECS_INTERVAL(sbi) - free_i->free_sections_node, 
-//			MAIN_SECS_INTERVAL(sbi), 
-//			100 * (MAIN_SECS_INTERVAL(sbi) - free_i->free_sections_node) / MAIN_SECS_INTERVAL(sbi)
-//		  );
-//	spin_unlock(&free_i->segmap_lock);
-//#endif
-
-
 	set_prefree_as_free_segments(sbi);
-
+	unsigned int total_inuse_sections = (MAIN_SECS_INTERVAL(sbi) - free_i->free_sections) + (MAIN_SECS_INTERVAL(sbi) - free_i->free_sections_node);
 
 #ifdef PRINT_FREE_SEC
 	cur_t = OS_TimeGetUS();
 	//if (cur_t - last_t > 1000000) {
 	if (cur_t - last_t > 5000000) {
 		spin_lock(&free_i->segmap_lock);
-		printk("%s: sec util: data: %lu / %lu %lu per node: %lu / %lu %lu per", 
-				__func__, 
-				MAIN_SECS_INTERVAL(sbi) - free_i->free_sections, 
-				MAIN_SECS_INTERVAL(sbi), 
-				100 * (MAIN_SECS_INTERVAL(sbi) - free_i->free_sections) / MAIN_SECS_INTERVAL(sbi), 
-				MAIN_SECS_INTERVAL(sbi) - free_i->free_sections_node, 
-				MAIN_SECS_INTERVAL(sbi), 
-				100 * (MAIN_SECS_INTERVAL(sbi) - free_i->free_sections_node) / MAIN_SECS_INTERVAL(sbi)
-			  );
+		printk("section utilization of regular region: %lu %%", 
+				100 * total_inuse_sections / MAIN_SECS_INTERVAL(sbi) 
+		);
 		spin_unlock(&free_i->segmap_lock);
 
 		last_t = cur_t;
@@ -11853,6 +11831,9 @@ static int build_free_segmap(struct f2fs_sb_info *sbi)
 	
 	free_i->free_segments_node = 0;
 	free_i->free_sections_node = 0;
+
+	free_i->total_inuse_sections = 0;
+
 	spin_lock_init(&free_i->segmap_lock);
 	return 0;
 }
@@ -11914,7 +11895,7 @@ static int build_free_segmap(struct f2fs_sb_info *sbi)
 //	return;
 //}
 
-static inline void LIPLFS_set_segment_two_partition(struct f2fs_sb_info *sbi)
+static inline void D2FS_set_segment_two_partition(struct f2fs_sb_info *sbi)
 {
 	struct sit_info *sit_i = SIT_I(sbi);
 	struct free_segmap_info *free_i = FREE_I(sbi);
@@ -11926,9 +11907,9 @@ static inline void LIPLFS_set_segment_two_partition(struct f2fs_sb_info *sbi)
 	struct seg_entry *se;
 #endif	
 
-	printk("%s: start ", __func__);
-	printk("[JWDBG] %s: seg0 blkaddr: 0x%x blocks Per seg: %d",
-		 __func__, SEG0_BLKADDR(sbi), sbi->blocks_per_seg);
+	//printk("%s: start ", __func__);
+	//printk("[JWDBG] %s: seg0 blkaddr: 0x%x blocks Per seg: %d",
+	//	 __func__, SEG0_BLKADDR(sbi), sbi->blocks_per_seg);
 	int nr_curseg_type = 3; 
 	start_type = CURSEG_HOT_DATA;
 AGAIN:	
@@ -11942,7 +11923,7 @@ AGAIN:
 		
 		segno = GET_SEGNO(sbi, start_blkaddr);
 		if (start_blkaddr != START_BLOCK(sbi, segno)){
-			printk("[JWDBG] %s: start blk does not match. start_blkaddr: 0x%x START_BLOCK: 0x%x", __func__, start_blkaddr, START_BLOCK(sbi, segno));
+			//printk("[JWDBG] %s: start blk does not match. start_blkaddr: 0x%x START_BLOCK: 0x%x", __func__, start_blkaddr, START_BLOCK(sbi, segno));
 			f2fs_bug_on(sbi, 1);
 		}
 		
@@ -11952,13 +11933,13 @@ AGAIN:
 		curseg->zone = GET_ZONE_FROM_SEG(sbi, curseg->segno);
 
 		if (start_type == CURSEG_HOT_DATA){	
-			printk("%s: CURSEG_HOT_DATA: START_SEGNO_INTERVAL: %u segno: %u", __func__, sbi->START_SEGNO_INTERVAL,
-					curseg->segno);
+			//printk("%s: CURSEG_HOT_DATA: START_SEGNO_INTERVAL: %u segno: %u", __func__, sbi->START_SEGNO_INTERVAL,
+			//		curseg->segno);
 			f2fs_bug_on(sbi, test_bit((curseg->segno - sbi->START_SEGNO_INTERVAL), free_i->free_segmap));
 		}
 		else if (start_type == CURSEG_HOT_NODE) {
-			printk("%s: CURSEG_HOT_NODE: START_SEGNO_INTERVAL_NODE: %u segno: %u", __func__, sbi->START_SEGNO_INTERVAL_NODE,
-					curseg->segno);
+			//printk("%s: CURSEG_HOT_NODE: START_SEGNO_INTERVAL_NODE: %u segno: %u", __func__, sbi->START_SEGNO_INTERVAL_NODE,
+			//		curseg->segno);
 			//sbi->START_SEGNO_INTERVAL_NODE = curseg->segno;
 			f2fs_bug_on(sbi, test_bit((curseg->segno - sbi->START_SEGNO_INTERVAL_NODE), free_i->free_segmap_node));
 		}
@@ -11967,7 +11948,7 @@ AGAIN:
 		secno = GET_SEC_FROM_SEG(sbi, segno);
 		superzone = GET_SUPERZONE_FROM_ZONE(sbi, curseg->zone);
 		
-		printk("%s: type %d  superzone: %d curseg_zone: %d secno: %d segno: %d !!!!!", __func__, type, superzone, curseg->zone, secno, segno);
+		//printk("%s: type %d  superzone: %d curseg_zone: %d secno: %d segno: %d !!!!!", __func__, type, superzone, curseg->zone, secno, segno);
 		
 		curseg->next_blkoff = 0;
 		curseg->next_segno = NULL_SEGNO;
@@ -11990,7 +11971,7 @@ AGAIN:
 		if (IS_NODESEG(type))
 		    SET_SUM_TYPE(sum_footer, SUM_TYPE_NODE);
 		
-		printk("type: %d, start_blkaddr: 0x%x startblkaddr: 0x%x, segno: %d", type, start_blkaddr, START_BLOCK(sbi, curseg->segno), curseg->segno);
+		//printk("type: %d, start_blkaddr: 0x%x startblkaddr: 0x%x, segno: %d", type, start_blkaddr, START_BLOCK(sbi, curseg->segno), curseg->segno);
 	}
 	up_read(&SM_I(sbi)->curseg_zone_lock);
 
@@ -12009,11 +11990,11 @@ AGAIN:
 		start_type = CURSEG_HOT_NODE;
 		goto AGAIN;
 	}
-	printk("%s: end ", __func__);
+	//printk("%s: end ", __func__);
 	return;
 }
 
-static inline void LIPLFS_set_segment(struct f2fs_sb_info *sbi)
+static inline void D2FS_set_segment(struct f2fs_sb_info *sbi)
 {
 	struct sit_info *sit_i = SIT_I(sbi);
 	struct free_segmap_info *free_i = FREE_I(sbi);
@@ -12212,7 +12193,7 @@ static int build_sit_entries(struct f2fs_sb_info *sbi)
        block_t total_node_blocks = 0;
 	   int pcnt = 0;
 
-	   printk("%s: MAIN_SEG_SLOTS: %d %u", __func__, MAIN_SEG_SLOTS(sbi), MAIN_SEG_SLOTS(sbi));
+	   //printk("%s: MAIN_SEG_SLOTS: %d %u", __func__, MAIN_SEG_SLOTS(sbi), MAIN_SEG_SLOTS(sbi));
        do {
                readed = f2fs_ra_meta_pages(sbi, start_blk, BIO_MAX_PAGES,
                                                        META_SIT, true);
@@ -12264,8 +12245,6 @@ static int build_sit_entries(struct f2fs_sb_info *sbi)
                }
                start_blk += readed;
        } while (start_blk < slot_blk_cnt);
-
-		printk("%s: OUT OF LOOP", __func__);
 
 	   down_read(&curseg->journal_rwsem);
        for (i = 0; i < sits_in_cursum(journal); i++) {
@@ -12488,8 +12467,8 @@ static void init_free_segmap(struct f2fs_sb_info *sbi)
 					   } else if (sentry->segno >= sbi->START_SEGNO_INTERVAL){
 						   __set_inuse(sbi, sentry->segno - sbi->START_SEGNO_INTERVAL);
 					   } else {
-						   printk("%s: !!!!!!!!! segno: %lu slot idx: %lu", __func__, 
-							   sentry->segno, start);
+						//   printk("%s: !!!!!!!!! segno: %lu slot idx: %lu", __func__, 
+						//	   sentry->segno, start);
 					   }
 #else 
 					   __set_inuse(sbi, sentry->segno);
@@ -13309,8 +13288,8 @@ int f2fs_build_segment_manager(struct f2fs_sb_info *sbi)
              return err;
 
 #if (SUPERZONE == 1)
-	   LIPLFS_set_segment_two_partition(sbi);
-	   //LIPLFS_set_segment(sbi);
+	   D2FS_set_segment_two_partition(sbi);
+	   //D2FS_set_segment(sbi);
        if (sm_info->seg0_blkaddr % (sbi)->blocks_per_seg != 0){
 	       printk("[JWDBG] %s: seg0_blkaddr = %d 0x%x, blk_per_seg: %d", __func__, sm_info->seg0_blkaddr,
 			       sm_info->seg0_blkaddr, sbi->blocks_per_seg);

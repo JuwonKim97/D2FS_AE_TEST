@@ -1403,14 +1403,14 @@ static inline void init_window_mgmt(struct conv_ftl *conv_ftl)
 		conv_ftl->wm[i].head_idx = 0;
 		conv_ftl->wm[i].tail_zoneno = NO_ZONE(conv_ftl, local_start_addr);
 		conv_ftl->wm[i].tail_idx = 0;
-		printk("%s type: %d head_zoneno: %llu tail_zoneno: %llu next_local_lpn: %llu head_idx: %d tail_idx: %d nzones_per_partition: %lu", 
-				__func__, i, conv_ftl->wm[i].head_zoneno, conv_ftl->wm[i].tail_zoneno, 
-		  		local_start_addr, conv_ftl->wm[i].head_idx, conv_ftl->wm[i].tail_idx, 
-				conv_ftl->wm[i].nzones_per_partition);
+		//printk("%s type: %d head_zoneno: %llu tail_zoneno: %llu next_local_lpn: %llu head_idx: %d tail_idx: %d nzones_per_partition: %lu", 
+		//		__func__, i, conv_ftl->wm[i].head_zoneno, conv_ftl->wm[i].tail_zoneno, 
+		//  		local_start_addr, conv_ftl->wm[i].head_idx, conv_ftl->wm[i].tail_idx, 
+		//		conv_ftl->wm[i].nzones_per_partition);
 #ifdef COUPLED_GC_PRINT
-		printk("%s type: %d head_zoneno: %llu tail_zoneno: %llu next_local_lpn: %llu head_idx: %d tail_idx: %d", 
-				__func__, i, conv_ftl->wm[i].head_zoneno, conv_ftl->wm[i].tail_zoneno, 
-		  		local_start_addr, conv_ftl->wm[i].head_idx, conv_ftl->wm[i].tail_idx);
+		//printk("%s type: %d head_zoneno: %llu tail_zoneno: %llu next_local_lpn: %llu head_idx: %d tail_idx: %d", 
+		//		__func__, i, conv_ftl->wm[i].head_zoneno, conv_ftl->wm[i].tail_zoneno, 
+		//  		local_start_addr, conv_ftl->wm[i].head_idx, conv_ftl->wm[i].tail_idx);
 #endif
 		if (IS_GC_PARTITION(i)) {
 			wftl_set_bit(get_zone_idx(conv_ftl, conv_ftl->wm[i].next_local_lpn), 
@@ -1444,6 +1444,8 @@ static void conv_init_ftl(struct conv_ftl *conv_ftl, struct convparams *cpp, str
 	conv_ftl->npages_main = NPAGES_MAIN(ssd->sp); /* to equalize mem consumption with interval map*/
 #endif
 	conv_ftl->nzones_per_partition = NZONES_PER_PARTITION(ssd->sp);
+
+	/*TODO: need to disable VOP on nzones_per_gc_partition. */
 	conv_ftl->nzones_per_gc_partition = NZONES_PER_GC_PARTITION(ssd->sp);
 #endif
 
@@ -3337,7 +3339,7 @@ static inline void print_GC_LOG_MEM(struct nvmev_ns *ns)
 {
 	unsigned int n_valid_gc_log = ns->gclm->n_buffered + ns->gclm->n_inflight;
 
-	/* disable merge so remove hlist node and to emulate 32bit, divide by 2 */
+	/* disable gc log merging so remove hlist node and to emulate 32bit address in the SSD firmware, divide by 2 */
 	unsigned int gc_log_size = sizeof(struct gc_log) - sizeof(struct hlist_node);
 	gc_log_size /= 2;
 	unsigned int gc_log_mem_MB = n_valid_gc_log * gc_log_size / 1024 / 1024;
@@ -3363,35 +3365,33 @@ static inline void print_part_util(struct nvmev_ns *ns)
 	struct conv_ftl *conv_ftl;
 	unsigned int valid_zone_cnt[10] = {0}, total_zone_cnt[10] = {0}, util_per[10] = {0}, 
 				 free_zone_cnt[10] = {0};
-	for (i = 0; i < 4; i ++) {
-		conv_ftl = &conv_ftls[i];
-		valid_zone_cnt[HOT_NODE_PARTITION] += conv_ftl->valid_zone_cnt[HOT_NODE_PARTITION]; 
-		valid_zone_cnt[HOT_DATA_PARTITION] += conv_ftl->valid_zone_cnt[HOT_DATA_PARTITION]; 
-		free_zone_cnt[COLD_DATA_PARTITION] += conv_ftl->wm[COLD_DATA_PARTITION].free_zone; 
-		free_zone_cnt[GC_PARTITION] += conv_ftl->wm[GC_PARTITION].free_zone;
-	}
-	
-	if (conv_ftl->nzones_per_partition > 0 && 
-		conv_ftl->nzones_per_gc_partition > 0) {
+	static int timecnt = 0;
+	timecnt ++;
+	if (timecnt % 5 == 0) {
+		unsigned int total_inuse_zone_cnt = 0;
 
-		printk("%s: data: %u / %u %u per. node: %u / %u %u per. gc_data: %u / %u %d per. gc_node: %u / %u %d per.", 
-				__func__, 
-			valid_zone_cnt[HOT_DATA_PARTITION] / 4, 
-			conv_ftl->nzones_per_partition, 
-			100 * valid_zone_cnt[HOT_DATA_PARTITION] / 4 / conv_ftl->nzones_per_partition, 
+		for (i = 0; i < 4; i ++) {
+			conv_ftl = &conv_ftls[i];
+			valid_zone_cnt[HOT_NODE_PARTITION] += conv_ftl->valid_zone_cnt[HOT_NODE_PARTITION]; 
+			valid_zone_cnt[HOT_DATA_PARTITION] += conv_ftl->valid_zone_cnt[HOT_DATA_PARTITION]; 
+			free_zone_cnt[COLD_DATA_PARTITION] += conv_ftl->wm[COLD_DATA_PARTITION].free_zone; 
+			free_zone_cnt[GC_PARTITION] += conv_ftl->wm[GC_PARTITION].free_zone;
+		}
+		
+		if (conv_ftl->nzones_per_partition > 0 && 
+			conv_ftl->nzones_per_gc_partition > 0) {
+			total_inuse_zone_cnt = 
+				conv_ftl->nzones_per_gc_partition - free_zone_cnt[COLD_DATA_PARTITION] / 4
+				+ conv_ftl->nzones_per_gc_partition - free_zone_cnt[GC_PARTITION] / 4;
+		}
+		
+		if (conv_ftl->nzones_per_partition > 0 && 
+			conv_ftl->nzones_per_gc_partition > 0) {
+			printk("section utilization of gc region: %u %%", 
+				100 * total_inuse_zone_cnt / conv_ftl->nzones_per_gc_partition
+			);
 
-			valid_zone_cnt[HOT_NODE_PARTITION] / 4, 
-			conv_ftl->nzones_per_partition, 
-			100 * valid_zone_cnt[HOT_NODE_PARTITION] / 4 / conv_ftl->nzones_per_partition,
-
-			conv_ftl->nzones_per_gc_partition - free_zone_cnt[COLD_DATA_PARTITION] / 4,
-			conv_ftl->nzones_per_gc_partition, 
-			100 - 100 * free_zone_cnt[COLD_DATA_PARTITION] / 4 / conv_ftl->nzones_per_gc_partition,
-
-			conv_ftl->nzones_per_gc_partition - free_zone_cnt[GC_PARTITION] / 4,
-			conv_ftl->nzones_per_gc_partition, 
-			100 - 100 * free_zone_cnt[GC_PARTITION] / 4 / conv_ftl->nzones_per_gc_partition
-		);
+		}
 	}
 }
 #endif
@@ -4471,8 +4471,8 @@ bool conv_discard(struct nvmev_ns *ns, struct nvmev_request *req, struct nvmev_r
 #ifdef ZONE_MAPPING
 		if (IS_META_PARTITION(no_partition)){
 			read_handler = read_meta_page_mapping_handler;
-			NVMEV_ERROR("[JWDBG] %s: discard on meta partition. slpn: 0x%llx elpn; 0x%llx\n", 
-							__func__, start_lpn, end_lpn);
+			//NVMEV_ERROR("[JWDBG] %s: discard on meta partition. slpn: 0x%llx elpn; 0x%llx\n", 
+			//				__func__, start_lpn, end_lpn);
 			discard_handler = invalidate_maptbl_ent;
 		} else if (IS_MAIN_PARTITION(no_partition)){
 			read_handler = read_zone_mapping_handler;

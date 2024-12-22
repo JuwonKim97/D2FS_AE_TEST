@@ -42,7 +42,7 @@
 #define CMD_CNT
 #define GC_LOG_MEM
 
-#undef PRINT_PART_UTIL
+#define PRINT_PART_UTIL
 
 #define GC_LOG_MERGE
 #define SEPARATE_GC_LOG

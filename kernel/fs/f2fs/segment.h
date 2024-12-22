@@ -346,6 +346,9 @@ struct free_segmap_info {
 	unsigned int free_sections_node;	/* # of free sections */
 	unsigned long *free_segmap_node;	/* free segment bitmap */
 	unsigned long *free_secmap_node;	/* free section bitmap */
+
+	unsigned int total_inuse_sections;	/* # of inuse (valid or invalid except free) 
+							sections */
 };
 
 /* Notice: The order of dirty type is same with CURSEG_XXX in f2fs.h */
@@ -557,6 +560,7 @@ static inline void __set_free(struct f2fs_sb_info *sbi, unsigned int segno)
 	if (next >= start_segno + usable_segs) {
 		clear_bit(secno, free_i->free_secmap);
 		free_i->free_sections++;
+		free_i->total_inuse_sections --;
 	}
 	spin_unlock(&free_i->segmap_lock);
 }
@@ -569,8 +573,10 @@ static inline void __set_inuse(struct f2fs_sb_info *sbi,
 
 	set_bit(segno, free_i->free_segmap);
 	free_i->free_segments--;
-	if (!test_and_set_bit(secno, free_i->free_secmap))
+	if (!test_and_set_bit(secno, free_i->free_secmap)){
 		free_i->free_sections--;
+		free_i->total_inuse_sections ++;
+	}
 }
 
 static inline void __set_test_and_free(struct f2fs_sb_info *sbi,
@@ -591,11 +597,10 @@ static inline void __set_test_and_free(struct f2fs_sb_info *sbi,
 		next = find_next_bit(free_i->free_segmap,
 				start_segno + sbi->segs_per_sec, start_segno);
 		if (next >= start_segno + usable_segs) {
-			if (test_and_clear_bit(secno, free_i->free_secmap))
+			if (test_and_clear_bit(secno, free_i->free_secmap)){
 				free_i->free_sections++;
-			//printk("%s: free segno: %lu %lu", __func__, 
-			//		GET_SEG_FROM_SEC(sbi, secno), 
-			//		GET_SEG_FROM_SEC(sbi, secno) + 1);
+				free_i->total_inuse_sections --;
+			}
 		}
 	}
 skip_free:
@@ -613,6 +618,7 @@ static inline void __set_test_and_inuse(struct f2fs_sb_info *sbi,
 		free_i->free_segments--;
 		if (!test_and_set_bit(secno, free_i->free_secmap))
 			free_i->free_sections--;
+			free_i->total_inuse_sections ++;
 	}
 	spin_unlock(&free_i->segmap_lock);
 }
@@ -645,6 +651,7 @@ static inline void __set_free_node(struct f2fs_sb_info *sbi, unsigned int segno)
 	if (next >= start_segno + usable_segs) {
 		clear_bit(secno, free_i->free_secmap_node);
 		free_i->free_sections_node++;
+		free_i->total_inuse_sections --;
 	}
 	spin_unlock(&free_i->segmap_lock);
 }
@@ -657,8 +664,10 @@ static inline void __set_inuse_node(struct f2fs_sb_info *sbi,
 
 	set_bit(segno, free_i->free_segmap_node);
 	free_i->free_segments_node--;
-	if (!test_and_set_bit(secno, free_i->free_secmap_node))
+	if (!test_and_set_bit(secno, free_i->free_secmap_node)) {
 		free_i->free_sections_node--;
+		free_i->total_inuse_sections ++;
+	}
 }
 
 static inline void __set_test_and_free_node(struct f2fs_sb_info *sbi,
@@ -679,11 +688,10 @@ static inline void __set_test_and_free_node(struct f2fs_sb_info *sbi,
 		next = find_next_bit(free_i->free_segmap_node,
 				start_segno + sbi->segs_per_sec, start_segno);
 		if (next >= start_segno + usable_segs) {
-			if (test_and_clear_bit(secno, free_i->free_secmap_node))
+			if (test_and_clear_bit(secno, free_i->free_secmap_node)) {
 				free_i->free_sections_node++;
-			//printk("%s: free segno: %lu %lu", __func__, 
-			//		GET_SEG_FROM_SEC(sbi, secno), 
-			//		GET_SEG_FROM_SEC(sbi, secno) + 1);
+				free_i->total_inuse_sections --;
+			}
 		}
 	}
 skip_free:
@@ -699,8 +707,10 @@ static inline void __set_test_and_inuse_node(struct f2fs_sb_info *sbi,
 	spin_lock(&free_i->segmap_lock);
 	if (!test_and_set_bit(segno, free_i->free_segmap_node)) {
 		free_i->free_segments_node--;
-		if (!test_and_set_bit(secno, free_i->free_secmap_node))
+		if (!test_and_set_bit(secno, free_i->free_secmap_node)) {
 			free_i->free_sections_node--;
+			free_i->total_inuse_sections ++;
+		}
 	}
 	spin_unlock(&free_i->segmap_lock);
 }

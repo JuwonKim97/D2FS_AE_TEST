@@ -370,13 +370,13 @@ struct nvmev_result {
 #define LOCAL_PARTITION_BITS		(PARTITION_BITS - SSD_PARTITION_BITS)
 #define LOCAL_PARTITION_SIZE		(PARTITION_SIZE / SSD_PARTITIONS)
 
-//#define	WINDOW_EXT_RATE		20/10 # ORIGINAL
 #define	WINDOW_EXT_RATE		16/10
-#define	IM_WINDOW_EXT_RATE		6	/* interval mapping's extension rate for consuming same mem with IM */
 #define MEM_EXT_RATE		1
 #define INVALID_MAPPING		NULL
 #define MAX_KMALLOC_SIZE	MB(1)
 #define MTL_ZONE_SIZE		(MAX_KMALLOC_SIZE - sizeof(struct mtl_zone_info))
+
+#define	IM_WINDOW_EXT_RATE		6	/* interval mapping's extension rate for consuming same mem with IM */
 
 #ifdef ZONE_MAPPING
 

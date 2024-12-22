@@ -658,15 +658,16 @@ static unsigned int __do_perform_io_dsm(struct nvmev_proc_table *pe)
 
 			/* JW: change paddr to offset. need to verify. */
 			if (offset & PAGE_OFFSET_MASK) { 
-				NVMEV_ERROR("[JWDBG] %s: offset not aligned to PG. ofs: %lx len: %lx\n", __func__, 
-						offset, length);
+				//NVMEV_ERROR("[JWDBG] %s: offset not aligned to PG. ofs: %lx len: %lx\n", __func__, 
+				//		offset, length);
 				mem_offs = offset & PAGE_OFFSET_MASK;
 				if (io_size + mem_offs > PAGE_SIZE)
 					io_size = PAGE_SIZE - mem_offs;
 			}
-			if (io_size != PAGE_SIZE)
-				NVMEV_ERROR("[JWDBG] %s: iosize is not PGSIZE. iosize: %ld\n", __func__, 
-						io_size);
+			if (io_size != PAGE_SIZE) {
+				//NVMEV_ERROR("[JWDBG] %s: iosize is not PGSIZE. iosize: %ld\n", __func__, 
+				//		io_size);
+			}
 
 #ifdef MULTI_PARTITION_MTL
 			free_mem_addr(&vdev->ns[nsid], offset, tlist);

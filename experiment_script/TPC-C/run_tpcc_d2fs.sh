@@ -7,7 +7,7 @@ MNT=/mnt
 DATA=/exp_mysql_data
 DEV_whole=/dev/nvme3n1
 CUR_DIR=$(pwd)
-FILESYSTEM=(d2fs_print_free_sec_1.6)
+FILESYSTEM=(d2fs)
 #FILESYSTEM=(d2fs_print_free_sec)
 OUTPUTDIR="d2fs_data/tpcc_D2FS_exp_output_${FILESYSTEM}_`date "+%Y%m%d"`_`date "+%H%M"`"
 
@@ -68,15 +68,32 @@ main()
 				
 	cat ${OUTPUTDIR}/dmesg | sed 's/\]//g' | sed 's/\[//g' | awk -v num="$number" '{$1 = $1 - num; print $0}' >${OUTPUTDIR}/dmesg_parsed
 
-	cat ${OUTPUTDIR}/dmesg | grep MG_CMD_CNT > ${OUTPUTDIR}/mgcmd_only
-#	cat ${OUTPUTDIR}/mgcmd_only | sed 's/\]//g' | sed 's/\[//g' | awk '{print $1, $6}' > ${OUTPUTDIR}/mgcmd_parsed
-	cat ${OUTPUTDIR}/mgcmd_only | sed 's/\]//g' | sed 's/\[//g' | awk -v num="$number" '{$1 = $1 - num; print $1, $6}'  > ${OUTPUTDIR}/mgcmd_parsed
+	cat ${OUTPUTDIR}/dmesg_parsed | grep MG_CMD_CNT > ${OUTPUTDIR}/mgcmd_only
+	echo "# timestamp	command count (MB)\n" > ${OUTPUTDIR}/migration_command_count
+	cat ${OUTPUTDIR}/mgcmd_only | awk '{print $1, $6}'  >> ${OUTPUTDIR}/migration_command_count
 	rm ${OUTPUTDIR}/mgcmd_only 
 
-	cat ${OUTPUTDIR}/dmesg | grep GC_LOG_MEM > ${OUTPUTDIR}/gclog_mem_only
-#	cat ${OUTPUTDIR}/gclog_mem_only | sed 's/\]//g' | sed 's/\[//g' | awk '{print $1, $4}' > ${OUTPUTDIR}/gclog_mem_parsed
-	cat ${OUTPUTDIR}/gclog_mem_only | sed 's/\]//g' | sed 's/\[//g' | awk -v num="$number" '{$1 = $1 - num; print $1, $4}'  > ${OUTPUTDIR}/gclog_mem_parsed
+	cat ${OUTPUTDIR}/dmesg_parsed | grep GC_LOG_MEM > ${OUTPUTDIR}/gclog_mem_only
+	echo "# timestamp	memory footprint (MB)\n" > ${OUTPUTDIR}/migration_record_memory_footprint 
+	cat ${OUTPUTDIR}/gclog_mem_only | awk '{print $1, $4}'  >> ${OUTPUTDIR}/migration_record_memory_footprint 
 	rm ${OUTPUTDIR}/gclog_mem_only 
+
+	cat ${OUTPUTDIR}/dmesg_parsed | grep 'GC_LATENCY: latency:' > ${OUTPUTDIR}/gc_latency_breakdown
+	echo "# timestamp	GC Total Latency (msec)		Read Latency (msec)	Write Latency (msec)\n" > ${OUTPUTDIR}/GC_latency_breakdown
+	cat ${OUTPUTDIR}/gc_latency_breakdown | sed 's/)//g' | sed 's/(//g' | awk '{print $1, $4, $6, $8}'  >> ${OUTPUTDIR}/GC_latency_breakdown
+	rm ${OUTPUTDIR}/gc_latency_breakdown
+	
+	cat ${OUTPUTDIR}/dmesg_parsed | grep 'section utilization of regular region' > ${OUTPUTDIR}/sec_util_regular_region
+	echo "# timestamp	utilization (%) \n" > ${OUTPUTDIR}/section_utilization_regular_region
+	cat ${OUTPUTDIR}/sec_util_regular_region | awk '{print $1, $7}'  >> ${OUTPUTDIR}/section_utilization_regular_region
+	rm ${OUTPUTDIR}/sec_util_regular_region
+			   
+	cat ${OUTPUTDIR}/dmesg_parsed | grep 'section utilization of gc region' > ${OUTPUTDIR}/sec_util_gc_region
+	echo "# timestamp	utilization (%) \n" > ${OUTPUTDIR}/section_utilization_gc_region
+	cat ${OUTPUTDIR}/sec_util_gc_region | awk '{print $1, $7}'  >> ${OUTPUTDIR}/section_utilization_gc_region
+	rm ${OUTPUTDIR}/sec_util_gc_region
+		
+	chown -R ${USER} ${OUTPUTDIR}
 
 	echo "==== End the experiment ===="
 }

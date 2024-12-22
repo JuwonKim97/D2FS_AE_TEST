@@ -7,7 +7,7 @@ MNT=/mnt
 
 DEV_whole=/dev/nvme3n1
 CUR_DIR=$(pwd)
-FILESYSTEM=(d2fs_print_free_sec_1.6)
+FILESYSTEM=(d2fs)
 OUTPUTDIR="d2fs_data/filebench_D2FS_exp_output_"${WORKLOAD}_${FILESYSTEM}"_`date "+%Y%m%d"`_`date "+%H%M"`"
 #FILESYSTEM=(d2fs)
 IO_TYPE=(randwrite)
@@ -93,32 +93,41 @@ main()
 			   dmesg > ${OUTPUTDIR_FS_JOB}/dmesg
 			   number=$(cat ${OUTPUTDIR_FS_JOB}/dmesg | grep STARTT | sed 's/\]//g' |  awk '{print $2}') 
 
-			   cat ${OUTPUTDIR_FS_JOB}/dmesg | sed 's/\]//g' | sed 's/\[//g' | awk -v num="$number" '{$1 = $1 - num; print $0}' >${OUTPUTDIR_FS_JOB}/dmesg_parsed
+		           cat ${OUTPUTDIR_FS_JOB}/dmesg |  sed 's/\]//g' | sed 's/\[//g' | awk -v num="$number" '{$1 = $1 - num; print $0}' > ${OUTPUTDIR_FS_JOB}/dmesg_parsed
 
-			   cat ${OUTPUTDIR_FS_JOB}/dmesg | grep MG_CMD_CNT > ${OUTPUTDIR_FS_JOB}/mgcmd_only
-#			   cat ${OUTPUTDIR_FS_JOB}/mgcmd_only | sed 's/\]//g' | sed 's/\[//g' | awk '{print $1, $6}' > ${OUTPUTDIR_FS_JOB}/mgcmd_parsed
-			   cat ${OUTPUTDIR_FS_JOB}/mgcmd_only | sed 's/\]//g' | sed 's/\[//g' | awk -v num="$number" '{$1 = $1 - num; print $1, $6}'  > ${OUTPUTDIR_FS_JOB}/mgcmd_parsed
-			   rm ${OUTPUTDIR_FS_JOB}/mgcmd_only 
-
-			   cat ${OUTPUTDIR_FS_JOB}/dmesg | grep GC_LOG_MEM > ${OUTPUTDIR_FS_JOB}/gclog_mem_only
-#			   cat ${OUTPUTDIR_FS_JOB}/gclog_mem_only | sed 's/\]//g' | sed 's/\[//g' | awk '{print $1, $4}' > ${OUTPUTDIR_FS_JOB}/gclog_mem_parsed
-			   cat ${OUTPUTDIR_FS_JOB}/gclog_mem_only | sed 's/\]//g' | sed 's/\[//g' | awk -v num="$number" '{$1 = $1 - num; print $1, $4}'  > ${OUTPUTDIR_FS_JOB}/gclog_mem_parsed
-			   rm ${OUTPUTDIR_FS_JOB}/gclog_mem_only 
+		           cat ${OUTPUTDIR_FS_JOB}/dmesg_parsed | grep MG_CMD_CNT > ${OUTPUTDIR_FS_JOB}/mgcmd_only
+			   echo "# timestamp	command count (MB)\n" > ${OUTPUTDIR_FS_JOB}/migration_command_count
+		           cat ${OUTPUTDIR_FS_JOB}/mgcmd_only | awk '{print $1, $6}'  >> ${OUTPUTDIR_FS_JOB}/migration_command_count
+		           rm ${OUTPUTDIR_FS_JOB}/mgcmd_only
+		
+		           cat ${OUTPUTDIR_FS_JOB}/dmesg_parsed | grep GC_LOG_MEM > ${OUTPUTDIR_FS_JOB}/gclog_mem_only
+			   echo "# timestamp	memory footprint (MB)\n" > ${OUTPUTDIR_FS_JOB}/migration_record_memory_footprint 
+		           cat ${OUTPUTDIR_FS_JOB}/gclog_mem_only | awk '{print $1, $4}'  >> ${OUTPUTDIR_FS_JOB}/migration_record_memory_footprint
+		           rm ${OUTPUTDIR_FS_JOB}/gclog_mem_only
+		           
+			   cat ${OUTPUTDIR_FS_JOB}/dmesg_parsed | grep 'GC_LATENCY: latency:' > ${OUTPUTDIR_FS_JOB}/gc_latency_breakdown
+			   echo "# timestamp	GC Total Latency (msec)		Read Latency (msec)	Write Latency (msec)\n" > ${OUTPUTDIR_FS_JOB}/GC_latency_breakdown
+		           cat ${OUTPUTDIR_FS_JOB}/gc_latency_breakdown | sed 's/)//g' | sed 's/(//g' | awk '{print $1, $4, $6, $8}'  >> ${OUTPUTDIR_FS_JOB}/GC_latency_breakdown
+		           rm ${OUTPUTDIR_FS_JOB}/gc_latency_breakdown
+			   
+			   cat ${OUTPUTDIR_FS_JOB}/dmesg_parsed | grep 'section utilization of regular region' > ${OUTPUTDIR_FS_JOB}/sec_util_regular_region
+			   echo "# timestamp	utilization (%) \n" > ${OUTPUTDIR_FS_JOB}/section_utilization_regular_region
+		           cat ${OUTPUTDIR_FS_JOB}/sec_util_regular_region | awk '{print $1, $7}'  >> ${OUTPUTDIR_FS_JOB}/section_utilization_regular_region
+			   rm ${OUTPUTDIR_FS_JOB}/sec_util_regular_region
+			   
+			   cat ${OUTPUTDIR_FS_JOB}/dmesg_parsed | grep 'section utilization of gc region' > ${OUTPUTDIR_FS_JOB}/sec_util_gc_region
+			   echo "# timestamp	utilization (%) \n" > ${OUTPUTDIR_FS_JOB}/section_utilization_gc_region
+		           cat ${OUTPUTDIR_FS_JOB}/sec_util_gc_region | awk '{print $1, $7}'  >> ${OUTPUTDIR_FS_JOB}/section_utilization_gc_region
+			   rm ${OUTPUTDIR_FS_JOB}/sec_util_gc_region
+	
 
 			   cat ${OUTPUTDIR_FS_JOB}/result.txt | grep -e Summary > ${OUTPUTDIR_FS_JOB}/result_time
 			   cat ${OUTPUTDIR_FS_JOB}/result_time | awk 'BEGIN {t=5} {print t, $6/1000} {t+=5}' > ${OUTPUTDIR_FS_JOB}/kiops_sum
 			   rm ${OUTPUTDIR_FS_JOB}/result_time
 
-   	  		   echo "fb end";
-
-			   echo "blkparsing start!";
-			   cat ${OUTPUTDIR_FS_JOB}/mem_log | grep 'Available'  | awk '{a += 1} {print a, $2/1024/1024}' >  ${OUTPUTDIR_FS_JOB}/available_mem_GB_per_sec
-			   cat ${OUTPUTDIR_FS_JOB}/mem_log | grep 'Free'  | awk '{a += 1} {print a, $2/1024/1024}' >  ${OUTPUTDIR_FS_JOB}/free_mem_GB_per_sec
 			   chown -R juwon ${OUTPUTDIR}
 
-
 			   echo "==== End the experiment ===="
-#dmesg > ${OUTPUTDIR_FS_JOB}/dmesg_aft_umount
 		   done
 	   	done
 		done

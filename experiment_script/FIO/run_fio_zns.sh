@@ -7,7 +7,7 @@ DEV_whole=/dev/nvme3n1
 CUR_DIR=$(pwd)
 FIO_PATH=(/home/juwon/fio_src)
 FILESYSTEM=(zns_print_gc_hack_hack)
-OUTPUTDIR="zns_data/fio_ZNS_exp_output`date "+%Y%m%d"`_`date "+%H%M"`"
+OUTPUTDIR="zns_data/fio_ZNS_exp_output_${FILESYSTEM}_`date "+%Y%m%d"`_`date "+%H%M"`"
 IO_TYPE=(randwrite)
 
 NUM_JOBS=(1)
@@ -108,7 +108,7 @@ main()
 			   awk -F ',' '{print $2}' | sort -n -k 1 > tmp_lat.txt
 			   mv tmp_lat.txt ${OUTPUTDIR_FS_JOB}/lat_sum_sorted;
 			   mv *.log ${OUTPUTDIR_FS_JOB}/;
-			   python ../general_resource/sum.py ${OUTPUTDIR_FS_JOB}/4k_iops. ${numjob} > ${OUTPUTDIR_FS_JOB}/kiops_sum1
+			   python ../general_resource/sum.py ${OUTPUTDIR_FS_JOB}/4k_iops. ${numjob} > ${OUTPUTDIR_FS_JOB}/kiops_sum
 			   dmesg > ${OUTPUTDIR_FS_JOB}/dmesg
 			   
 			   number=$(cat ${OUTPUTDIR_FS_JOB}/dmesg | grep STARTT | sed 's/\]//g' |  awk '{print $2}')
