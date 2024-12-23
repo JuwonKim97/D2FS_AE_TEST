@@ -47,7 +47,50 @@ echo "#TPC-C" >> $OUTPUT
 echo -e "D\t${D2FS_TPCC_READ}\t${D2FS_TPCC_WRITE}\t0\t0\t0\t0\t0\t0" >> $OUTPUT
 echo -e "Z\t0\t0\t${ZNS_TPCC_CP}\t${ZNS_TPCC_META}\t${ZNS_TPCC_FILEMAP}\t${ZNS_TPCC_CACHE}\t${ZNS_TPCC_READ}\t${ZNS_TPCC_WRITE}" >> $OUTPUT
 
+# YCSB-A GC Latency Breakdown
+D2FS_YCSBA_READ=$(tail -n 1 "$D2FS_YCSBA" | awk '{print $3}')
+D2FS_YCSBA_WRITE=$(tail -n 1 "$D2FS_YCSBA" | awk '{print $4}')
 
+ZNS_YCSBA_CP=$(tail -n 1 "$ZNS_YCSBA" | awk '{print $3}')
+ZNS_YCSBA_META=$(tail -n 1 "$ZNS_YCSBA" | awk '{print $4}')
+ZNS_YCSBA_FILEMAP=$(tail -n 1 "$ZNS_YCSBA" | awk '{print $5}')
+ZNS_YCSBA_CACHE=$(tail -n 1 "$ZNS_YCSBA" | awk '{print $6}')
+ZNS_YCSBA_READ=$(tail -n 1 "$ZNS_YCSBA" | awk '{print $7}')
+ZNS_YCSBA_WRITE=$(tail -n 1 "$ZNS_YCSBA" | awk '{print $8}')
+
+echo "#ycsba" >> $OUTPUT
+echo -e "D\t${D2FS_YCSBA_READ}\t${D2FS_YCSBA_WRITE}\t0\t0\t0\t0\t0\t0" >> $OUTPUT
+echo -e "Z\t0\t0\t${ZNS_YCSBA_CP}\t${ZNS_YCSBA_META}\t${ZNS_YCSBA_FILEMAP}\t${ZNS_YCSBA_CACHE}\t${ZNS_YCSBA_READ}\t${ZNS_YCSBA_WRITE}" >> $OUTPUT
+
+# YCSB-F GC Latency Breakdown
+D2FS_YCSBF_READ=$(tail -n 1 "$D2FS_YCSBF" | awk '{print $3}')
+D2FS_YCSBF_WRITE=$(tail -n 1 "$D2FS_YCSBF" | awk '{print $4}')
+
+ZNS_YCSBF_CP=$(tail -n 1 "$ZNS_YCSBF" | awk '{print $3}')
+ZNS_YCSBF_META=$(tail -n 1 "$ZNS_YCSBF" | awk '{print $4}')
+ZNS_YCSBF_FILEMAP=$(tail -n 1 "$ZNS_YCSBF" | awk '{print $5}')
+ZNS_YCSBF_CACHE=$(tail -n 1 "$ZNS_YCSBF" | awk '{print $6}')
+ZNS_YCSBF_READ=$(tail -n 1 "$ZNS_YCSBF" | awk '{print $7}')
+ZNS_YCSBF_WRITE=$(tail -n 1 "$ZNS_YCSBF" | awk '{print $8}')
+
+echo "#ycsbf" >> $OUTPUT
+echo -e "D\t${D2FS_YCSBF_READ}\t${D2FS_YCSBF_WRITE}\t0\t0\t0\t0\t0\t0" >> $OUTPUT
+echo -e "Z\t0\t0\t${ZNS_YCSBF_CP}\t${ZNS_YCSBF_META}\t${ZNS_YCSBF_FILEMAP}\t${ZNS_YCSBF_CACHE}\t${ZNS_YCSBF_READ}\t${ZNS_YCSBF_WRITE}" >> $OUTPUT
+
+# Fileserver GC Latency Breakdown
+D2FS_FILESERVER_READ=$(tail -n 1 "$D2FS_FILESERVER" | awk '{print $3}')
+D2FS_FILESERVER_WRITE=$(tail -n 1 "$D2FS_FILESERVER" | awk '{print $4}')
+
+ZNS_FILESERVER_CP=$(tail -n 1 "$ZNS_FILESERVER" | awk '{print $3}')
+ZNS_FILESERVER_META=$(tail -n 1 "$ZNS_FILESERVER" | awk '{print $4}')
+ZNS_FILESERVER_FILEMAP=$(tail -n 1 "$ZNS_FILESERVER" | awk '{print $5}')
+ZNS_FILESERVER_CACHE=$(tail -n 1 "$ZNS_FILESERVER" | awk '{print $6}')
+ZNS_FILESERVER_READ=$(tail -n 1 "$ZNS_FILESERVER" | awk '{print $7}')
+ZNS_FILESERVER_WRITE=$(tail -n 1 "$ZNS_FILESERVER" | awk '{print $8}')
+
+echo "#fileserver" >> $OUTPUT
+echo -e "D\t${D2FS_FILESERVER_READ}\t${D2FS_FILESERVER_WRITE}\t0\t0\t0\t0\t0\t0" >> $OUTPUT
+echo -e "Z\t0\t0\t${ZNS_FILESERVER_CP}\t${ZNS_FILESERVER_META}\t${ZNS_FILESERVER_FILEMAP}\t${ZNS_FILESERVER_CACHE}\t${ZNS_FILESERVER_READ}\t${ZNS_FILESERVER_WRITE}" >> $OUTPUT
 #python3 parser.py devgc_kiops_raw > devgc_kiops
 #python3 parser.py fsgc_kiops_raw > fsgc_kiops
 
