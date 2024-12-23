@@ -3320,6 +3320,9 @@ static inline void print_MG_CMD_CNT(struct nvmev_ns *ns)
 		printk("%s: mg cmd submitted: %llu (per sec) total mg cmd: %llu total completed mg cmd: %llu", 
 			__func__, ns->mg_cmd_cnt/PRINT_TIME_SEC, ns->total_mg_cmd_cnt, 
 			ns->total_completed_mg_cmd_cnt);
+	} else {
+		printk("%s: mg cmd submitted: %llu (per sec)", 
+			__func__, 0);
 	}
 }
 #endif
@@ -3345,14 +3348,14 @@ static inline void print_GC_LOG_MEM(struct nvmev_ns *ns)
 	unsigned int gc_log_mem_MB = n_valid_gc_log * gc_log_size / 1024 / 1024;
 
 	if (ns->gclm->buffering_trial_cnt) {
-		printk("%s: mem: %u MB gc log cnt (buffer/inflight): %u ( %u / %u ) merge ratio: %u / %u %u percent total: %u discard: %u submit: %u completed: %u", 
+		printk("%s: mem: %u MB migration record cnt (buffer/inflight): %u ( %u / %u ) total: %u discard: %u submit: %u completed: %u", 
 			__func__, gc_log_mem_MB, 
 			n_valid_gc_log, ns->gclm->n_buffered, ns->gclm->n_inflight, 
-			ns->gclm->buffering_trial_cnt - ns->gclm->buffering_cnt, 
-			ns->gclm->buffering_trial_cnt, 
-			(ns->gclm->buffering_trial_cnt - ns->gclm->buffering_cnt) * 100 
-			/ ns->gclm->buffering_trial_cnt , 
 			ns->gclm->buffering_trial_cnt, ns->discarded_gc_log, ns->total_mg_cmd_cnt * 256, ns->gclm->n_log_completed);
+	} else {
+		printk("%s: mem: %u MB ", 
+			__func__, 0 
+			);
 	}
 }
 #endif
@@ -4259,7 +4262,7 @@ bool lm_write(struct nvmev_ns *ns, struct nvmev_request *req, struct nvmev_resul
 		end_lpn -= START_OFS_IN_MAIN_PART;
 		if (min_slpn[NO_PARTITION(start_lpn)] > start_lpn){
 			min_slpn[NO_PARTITION(start_lpn)] = start_lpn;
-			printk("%s: type: %lld start_lpn: 0x%llx", __func__, NO_PARTITION(start_lpn), start_lpn);
+			//printk("%s: type: %lld start_lpn: 0x%llx", __func__, NO_PARTITION(start_lpn), start_lpn);
 		}
 		ns->total_write_main_blks_host += (end_lpn - start_lpn + 1);
 	}

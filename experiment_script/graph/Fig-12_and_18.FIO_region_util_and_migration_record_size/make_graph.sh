@@ -1,9 +1,9 @@
 #!/bin/bash
 
-MG_CMD=$(find ./data -name "migration_command_count")
-MG_LOG_MEM=$(find ./data -name "migration_record_memory_footprint")
-REG_REGION_UTIL=$(find ./data -name "section_utilization_regular_region")
-GC_REGION_UTIL=$(find ./data -name "section_utilization_gc_region")
+MG_CMD=$(find ./d2fs -name "migration_command_count")
+MG_LOG_MEM=$(find ./d2fs -name "migration_record_memory_footprint")
+REG_REGION_UTIL=$(find ./d2fs -name "section_utilization_regular_region")
+GC_REGION_UTIL=$(find ./d2fs -name "section_utilization_gc_region")
 
 cp "$MG_CMD" ./
 cp "$MG_LOG_MEM" ./

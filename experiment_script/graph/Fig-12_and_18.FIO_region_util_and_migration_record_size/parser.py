@@ -8,8 +8,12 @@ timegap = int(sys.argv[1])
 last_start_t = 0
 tmp_kiops_sum = 0
 tmp_cnt = 0
+is_first_line = True
 with open(fname, 'r') as f:
     for l in f:
+	if (is_first_line):
+		is_first_line = False
+		continue
         tmpl = l.strip().split()
 		#print(tmpl)
         t = float(tmpl[0])
