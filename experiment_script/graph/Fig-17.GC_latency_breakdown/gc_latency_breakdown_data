@@ -1,0 +1,7 @@
+#	Dread	Dwrite	CP	Meta	Filemap	Cache	Hread	Hwrite
+#fio
+D	3232	5427	0	0	0	0	0	0
+Z	0	0	4508	931	6250	9495	2317	1721
+#TPC-C
+D			0	0	0	0	0	0
+Z	0	0	7395	1377	9623	6992	1364	3079

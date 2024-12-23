@@ -4687,8 +4687,8 @@ __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
 	unsigned long long end_t;
 	if (cur_t - last_t > 1000000) {
 		//dump_stack();
-		printk("%s: duration_per_sec: %llu cnt_per_sec: %llu duration: %llu cnt: %llu", __func__, 
-			duration_per_sec, cnt_per_sec, duration, cnt);
+		//printk("%s: duration_per_sec: %llu cnt_per_sec: %llu duration: %llu cnt: %llu", __func__, 
+		//	duration_per_sec, cnt_per_sec, duration, cnt);
 		last_t = cur_t;
 		duration_per_sec = 0;
 		cnt_per_sec = 0;

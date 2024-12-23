@@ -403,8 +403,8 @@ static inline uint64_t get_relational_zoneno(struct conv_ftl *conv_ftl, uint64_t
 	zone_ofs = cur_zoneno - wm->head_zoneno;
 
 	if (cur_zoneno < wm->head_zoneno || zone_ofs > wm->nzones_per_partition){
-		printk("%s: cur_zoneno: %llu head_zoneno: %llu, nzones_per_partition: %lu", 
-				__func__, cur_zoneno, wm->head_zoneno, wm->nzones_per_partition);
+		//printk("%s: cur_zoneno: %llu head_zoneno: %llu, nzones_per_partition: %lu", 
+		//		__func__, cur_zoneno, wm->head_zoneno, wm->nzones_per_partition);
 	}
 
 	return zone_ofs;
@@ -1474,14 +1474,14 @@ static inline void init_window_mgmt(struct conv_ftl *conv_ftl)
 		conv_ftl->wm[i].head_idx = 0;
 		conv_ftl->wm[i].tail_zoneno = NO_ZONE(conv_ftl, local_start_addr);
 		conv_ftl->wm[i].tail_idx = 0;
-		printk("%s type: %d head_zoneno: %llu tail_zoneno: %llu next_local_lpn: %llu head_idx: %d tail_idx: %d nzones_per_partition: %lu", 
-				__func__, i, conv_ftl->wm[i].head_zoneno, conv_ftl->wm[i].tail_zoneno, 
-		  		local_start_addr, conv_ftl->wm[i].head_idx, conv_ftl->wm[i].tail_idx, 
-				conv_ftl->wm[i].nzones_per_partition);
+		//printk("%s type: %d head_zoneno: %llu tail_zoneno: %llu next_local_lpn: %llu head_idx: %d tail_idx: %d nzones_per_partition: %lu", 
+		//		__func__, i, conv_ftl->wm[i].head_zoneno, conv_ftl->wm[i].tail_zoneno, 
+		//  		local_start_addr, conv_ftl->wm[i].head_idx, conv_ftl->wm[i].tail_idx, 
+		//		conv_ftl->wm[i].nzones_per_partition);
 #ifdef COUPLED_GC_PRINT
-		printk("%s type: %d head_zoneno: %llu tail_zoneno: %llu next_local_lpn: %llu head_idx: %d tail_idx: %d", 
-				__func__, i, conv_ftl->wm[i].head_zoneno, conv_ftl->wm[i].tail_zoneno, 
-		  		local_start_addr, conv_ftl->wm[i].head_idx, conv_ftl->wm[i].tail_idx);
+		//printk("%s type: %d head_zoneno: %llu tail_zoneno: %llu next_local_lpn: %llu head_idx: %d tail_idx: %d", 
+		//		__func__, i, conv_ftl->wm[i].head_zoneno, conv_ftl->wm[i].tail_zoneno, 
+		//  		local_start_addr, conv_ftl->wm[i].head_idx, conv_ftl->wm[i].tail_idx);
 #endif
 		if (IS_GC_PARTITION(i)) {
 			wftl_set_bit(get_zone_idx(conv_ftl, conv_ftl->wm[i].next_local_lpn), 
@@ -1651,8 +1651,8 @@ void conv_init_namespace(struct nvmev_ns *ns, uint32_t id, uint64_t size, void *
 	ns->n_gc_log_max = ns->size / PAGE_SIZE * sizeof(uint32_t) / 
 		( (sizeof(struct gc_log) - sizeof(struct hlist_node)) / 2)
 		* RATIO_OF_GC_LOG_TO_PAGE_MAP / 100;
-	printk("%s: n_gc_log_max: %u gc_log size: %u", __func__, ns->n_gc_log_max, 
-			sizeof(struct gc_log));
+	//printk("%s: n_gc_log_max: %u gc_log size: %u", __func__, ns->n_gc_log_max, 
+	//		sizeof(struct gc_log));
 
 #ifdef COUPLED_GC
 	struct gc_log_mgmt *gclm;
@@ -3269,9 +3269,9 @@ static inline void print_WAF(struct nvmev_ns *ns)
 		unsigned int total_waf = 
 			(100* (ns->total_write_volume_gc + ns->total_write_volume_host)) 
 			/ ns->total_write_volume_host;
-		printk("%s: WAF: %u percent gc: %llu KB write_req: %llu KB total: %llu total WAF: %u percent", 
-			__func__, waf, ns->write_volume_gc*4, ns->write_volume_host*4, 
-			ns->total_write_volume_host*4, total_waf);
+		//printk("%s: WAF: %u percent gc: %llu KB write_req: %llu KB total: %llu total WAF: %u percent", 
+		//	__func__, waf, ns->write_volume_gc*4, ns->write_volume_host*4, 
+		//	ns->total_write_volume_host*4, total_waf);
 	}
 }
 
@@ -3295,9 +3295,9 @@ static inline void print_MG_CMD_CNT(struct nvmev_ns *ns)
 #ifdef CMD_CNT
 static inline void print_CMD_CNT(struct nvmev_ns *ns)
 {
-	printk("%s: total transfer volume. write: %d KB read: %d KB discard: %d",
-		__func__, ns->total_write_blks_host * 4,
-		ns->total_read_blks_host * 4, ns->total_discard_cmds_host * 4);
+	//printk("%s: total transfer volume. write: %d KB read: %d KB discard: %d",
+	//	__func__, ns->total_write_blks_host * 4,
+	//	ns->total_read_blks_host * 4, ns->total_discard_cmds_host * 4);
 }
 #endif
 
@@ -3355,13 +3355,14 @@ static inline void print_CHIP_UTIL(struct nvmev_ns *ns)
 	ns->avg_nand_active_t_sum_total += avg_nand_active_t; 
 	ns->nand_idle_t_sum = 0;
 	ns->nand_active_t_sum = 0; 
-	if (avg_nand_idle_t + avg_nand_active_t > 0) 
-		printk("%s: util: %llu %%  total util: %llu %% ", 
-				__func__, 
-				avg_nand_active_t * 100 / (avg_nand_idle_t + avg_nand_active_t),
-				ns->avg_nand_active_t_sum_total * 100 
-				/ (ns->avg_nand_idle_t_sum_total + ns->avg_nand_active_t_sum_total)
-			  );
+	if (avg_nand_idle_t + avg_nand_active_t > 0) { 
+		//printk("%s: util: %llu %%  total util: %llu %% ", 
+		//		__func__, 
+		//		avg_nand_active_t * 100 / (avg_nand_idle_t + avg_nand_active_t),
+		//		ns->avg_nand_active_t_sum_total * 100 
+		//		/ (ns->avg_nand_idle_t_sum_total + ns->avg_nand_active_t_sum_total)
+		//	  );
+	}
 }
 #endif
 
@@ -4156,8 +4157,9 @@ bool lm_write(struct nvmev_ns *ns, struct nvmev_request *req, struct nvmev_resul
 		end_lpn  = end_lpn - (SADDR_ZNS - START_OFS_IN_MAIN_PART) + 0x20000000;
 	}
 	int no_partition = NO_LOCAL_PARTITION(start_lpn / nr_parts);
-	if (no_partition == COLD_DATA_PARTITION || no_partition == COLD_NODE_PARTITION)
-		printk("%s: host write on cold partition!! type: %d lpn: %lld", __func__, no_partition, start_lpn);
+	if (no_partition == COLD_DATA_PARTITION || no_partition == COLD_NODE_PARTITION) {
+		//printk("%s: host write on cold partition!! type: %d lpn: %lld", __func__, no_partition, start_lpn);
+	}
 
 	//if (no_partition != NO_LOCAL_PARTITION(end_lpn / nr_parts)) {
 	//	printk("lm_write: start_lpn=0x%llx, len=%d, end_lpn=0x%llx", start_lpn_, nr_lba, end_lpn_);
@@ -4240,7 +4242,7 @@ bool lm_write(struct nvmev_ns *ns, struct nvmev_request *req, struct nvmev_resul
 		end_lpn -= START_OFS_IN_MAIN_PART;
 		if (min_slpn[NO_PARTITION(start_lpn)] > start_lpn){
 			min_slpn[NO_PARTITION(start_lpn)] = start_lpn;
-			printk("%s: type: %lld start_lpn: 0x%llx", __func__, NO_PARTITION(start_lpn), start_lpn);
+			//printk("%s: type: %lld start_lpn: 0x%llx", __func__, NO_PARTITION(start_lpn), start_lpn);
 		}
 	}
 	

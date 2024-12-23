@@ -57,7 +57,7 @@ main()
 	
 	cd ${YCSB}
 	su root -c 'echo STARTTTTTT > /dev/kmsg' 
-	sudo bin/ycsb run jdbc -P workloads/workloada -P db.properties \
+	sudo bin/ycsb run jdbc -P ${CUR_DIR}/workloada -P db.properties \
 		       	-p recordcount=${RECOUNT[i]} \
 	       		-p fieldlength=${fieldlength} \
 			-p operationcount=${OPCOUNT} \

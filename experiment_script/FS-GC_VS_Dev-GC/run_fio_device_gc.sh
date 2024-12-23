@@ -1,6 +1,7 @@
 #!/bin/bash
 
 MNT=/mnt
+DATA=/exp_mysql_data
 
 DEV=(/dev/nvme2n1p1)
 DEV_sub=(/dev/nvme2n1p2)
@@ -23,8 +24,15 @@ main()
 	echo -e "n\n\n\n\n+256G\nw" | fdisk ${DEV_whole}
 	echo -e "n\n\n\n\n\nw" | fdisk ${DEV_whole}
 
+	# Fill the Empty Partition
 	mkfs.ext4 ${DEV_sub}
 	mount ${DEV_sub} /tmp_mnt
+	cp -rp ${DATA}/cold_40G /tmp_mnt/cold_40G_1
+	cp -rp ${DATA}/cold_40G /tmp_mnt/cold_40G_2
+	cp -rp ${DATA}/cold_40G /tmp_mnt/cold_40G_3
+	cp -rp ${DATA}/cold_40G /tmp_mnt/cold_40G_4
+	cp -rp ${DATA}/cold_40G /tmp_mnt/cold_40G_5
+	cp -rp ${DATA}/cold_20G /tmp_mnt/cold_20G
 	
 	# Create result root directory
 	mkdir ${OUTPUTDIR}

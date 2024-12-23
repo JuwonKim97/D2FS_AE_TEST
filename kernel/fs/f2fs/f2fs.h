@@ -2605,9 +2605,9 @@ static inline struct page *f2fs_grab_cache_page(struct address_space *mapping,
 
 
 	if (cur_t - last_t > 1000000) {
-		printk("%s: lat_sum_per_sec: %llu  grab_write_cnt_per_sec: %d total_grab__write_cnt: %d ", 
-			__func__, avg_lat_per_sec, grab_for_write_cnt_per_sec, 
-			grab_for_write_cnt);
+		//printk("%s: lat_sum_per_sec: %llu  grab_write_cnt_per_sec: %d total_grab__write_cnt: %d ", 
+		//	__func__, avg_lat_per_sec, grab_for_write_cnt_per_sec, 
+		//	grab_for_write_cnt);
 		last_t = cur_t;
 		avg_lat_per_sec = 0;
 		grab_for_write_cnt_per_sec = 0;

@@ -2,11 +2,10 @@
 
 MNT=/mnt
 
-DEV=(/dev/nvme3n1p1)
 DEV_whole=/dev/nvme3n1
 CUR_DIR=$(pwd)
 FIO_PATH=(/home/juwon/fio_src)
-FILESYSTEM=(zns_print_gc_hack_hack)
+FILESYSTEM=(zns)
 OUTPUTDIR="zns_data/fio_ZNS_exp_output_${FILESYSTEM}_`date "+%Y%m%d"`_`date "+%H%M"`"
 IO_TYPE=(randwrite)
 
@@ -80,7 +79,7 @@ main()
 			   sync
 			   echo 3 > /proc/sys/vm/drop_caches 
 			   sudo sysctl kernel.randomize_va_space=0;
-			  su root -c 'echo STARTTTTTT > /dev/kmsg' 
+			   su root -c 'echo STARTTTTTT > /dev/kmsg'
 			   ${FIO_PATH}/fio \
 				   	    --filename=/mnt/test  \
 				   	    --name test \
@@ -101,6 +100,8 @@ main()
 					    > ${OUTPUTDIR_FS_JOB}/result_${block_size}.txt;
 
 			   
+			   echo "==== Workload complete ===="
+			   echo "==== Process Result Data ===="
 			   echo $'\n'
 			   rm new
 			   ln -s ${OUTPUTDIR_FS_JOB} new
@@ -110,30 +111,21 @@ main()
 			   mv *.log ${OUTPUTDIR_FS_JOB}/;
 			   python ../general_resource/sum.py ${OUTPUTDIR_FS_JOB}/4k_iops. ${numjob} > ${OUTPUTDIR_FS_JOB}/kiops_sum
 			   dmesg > ${OUTPUTDIR_FS_JOB}/dmesg
-			   
+
 			   number=$(cat ${OUTPUTDIR_FS_JOB}/dmesg | grep STARTT | sed 's/\]//g' |  awk '{print $2}')
 
-		           cat ${OUTPUTDIR_FS_JOB}/dmesg | grep MG_CMD_CNT > ${OUTPUTDIR_FS_JOB}/mgcmd_only
-		           cat ${OUTPUTDIR_FS_JOB}/mgcmd_only | sed 's/\]//g' | sed 's/\[//g' | awk -v num="$number" '{$1 = $1 - num; print $1, $6}'  > ${OUTPUTDIR_FS_JOB}/mgcmd_parsed
-		           rm ${OUTPUTDIR_FS_JOB}/mgcmd_only
-		
-		           cat ${OUTPUTDIR_FS_JOB}/dmesg | grep GC_LOG_MEM > ${OUTPUTDIR_FS_JOB}/gclog_mem_only
-		           cat ${OUTPUTDIR_FS_JOB}/gclog_mem_only | sed 's/\]//g' | sed 's/\[//g' | awk -v num="$number" '{$1 = $1 - num; print $1, $4}'  > ${OUTPUTDIR_FS_JOB}/gclog_mem_parsed
-		           rm ${OUTPUTDIR_FS_JOB}/gclog_mem_only
-		
+		           cat ${OUTPUTDIR_FS_JOB}/dmesg |  sed 's/\]//g' | sed 's/\[//g' | awk -v num="$number" '{$1 = $1 - num; print $0}' > ${OUTPUTDIR_FS_JOB}/dmesg_parsed
 
-			   #./taillat_fb.sh ${OUTPUTDIR_FS_JOB}
-   	  		   echo "fb end";
+			   cat ${OUTPUTDIR_FS_JOB}/dmesg_parsed | grep 'GC_LATENCY: latency:' > ${OUTPUTDIR_FS_JOB}/gc_latency_breakdown
+			   echo "# timestamp	GC Total Latency (msec)		CP	Meta	Filemap	Cache	Read	Write\n" > ${OUTPUTDIR_FS_JOB}/GC_latency_breakdown
+			   cat ${OUTPUTDIR_FS_JOB}/dmesg_parsed | grep 'gc_latency_breakdown total' | awk '{print $1, $5, $7, $9, $11, $13, $15, $17}' >>  ${OUTPUTDIR_FS_JOB}/GC_latency_breakdown
+			   rm ${OUTPUTDIR_FS_JOB}/gc_latency_breakdown
 
-			   cp throughput_waf.gpi  ${OUTPUTDIR_FS_JOB}/
-			   cp throughput_mgcmd.gpi  ${OUTPUTDIR_FS_JOB}/
-			   cp throughput_gclog_mem.gpi  ${OUTPUTDIR_FS_JOB}/
+		
 			   chown -R juwon ${OUTPUTDIR}
 
-			   echo "==== Workload complete ===="
 
 			   echo "==== End the experiment ===="
-#dmesg > ${OUTPUTDIR_FS_JOB}/dmesg_aft_umount
 		   done
 	   	done
 		done

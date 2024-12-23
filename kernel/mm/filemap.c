@@ -962,12 +962,12 @@ noinline int __add_to_page_cache_locked_jw(struct page *page,
 
 	if (cur_t - last_t > 1000000) {
 		//if (cache_trial_cnt > 0) 
-		printk("%s: p3 init_time: %llu get_page_t: %llu cgroup_time: %llu loop_out_t: %llu loop_t: %llu [xas_split_alloc: %llu xas_lock_irq_time: %llu  xas_split_time: %llu xas_store_t: %llu inc_lruvec_time: %llu xas_unlock_irq_time: %llu xas_nomem_t: %llu] xas_error_t: %llu trace_t: %llu, call_cnt: %d loop_cnt: %d err_cnt: %d err_cnt2: %d whole_t: %llu whole_t_noprint: %llu", 
-			__func__, init_time, get_page_time, mem_cgroup_time, loop_out_whole_time, 
-			loop_whole_time, xas_split_alloc_time, 
-			xas_lock_irq_time, xas_split_time, xas_store_time, 
-			inc_lruvec_time, xas_unlock_irq_time, 
-			xas_nomem_time, xas_error_time, trace_time, call_cnt, loop_cnt, err_cnt, err_cnt2, whole_time, whole_time_noprint);
+		//printk("%s: p3 init_time: %llu get_page_t: %llu cgroup_time: %llu loop_out_t: %llu loop_t: %llu [xas_split_alloc: %llu xas_lock_irq_time: %llu  xas_split_time: %llu xas_store_t: %llu inc_lruvec_time: %llu xas_unlock_irq_time: %llu xas_nomem_t: %llu] xas_error_t: %llu trace_t: %llu, call_cnt: %d loop_cnt: %d err_cnt: %d err_cnt2: %d whole_t: %llu whole_t_noprint: %llu", 
+		//	__func__, init_time, get_page_time, mem_cgroup_time, loop_out_whole_time, 
+		//	loop_whole_time, xas_split_alloc_time, 
+		//	xas_lock_irq_time, xas_split_time, xas_store_time, 
+		//	inc_lruvec_time, xas_unlock_irq_time, 
+		//	xas_nomem_time, xas_error_time, trace_time, call_cnt, loop_cnt, err_cnt, err_cnt2, whole_time, whole_time_noprint);
 		
 		last_t = cur_t;
 	}
@@ -1172,8 +1172,8 @@ int add_to_page_cache_lru_jw(struct page *page, struct address_space *mapping,
 	
 	if (cur_t - last_t > 1000000) {
 		//if (cache_trial_cnt > 0) 
-		printk("%s: p3 add_to_page_cache: %llu", 
-			__func__, add_cache_time);
+		//printk("%s: p3 add_to_page_cache: %llu", 
+		//	__func__, add_cache_time);
 		last_t = cur_t;
 	}
 
@@ -2135,10 +2135,10 @@ struct page *pagecache_get_page_jw(struct address_space *mapping, pgoff_t index,
 	unsigned long long cur_t = OS_TimeGetUS_4();
 	if (cur_t - last_t > 1000000) {
 		//if (cache_trial_cnt > 0) 
-		printk("%s: p3 pgcache hit: %llu trial: %llu alloc_cnt: %llu call_cnt: %llu", __func__, 
-		cache_hit_cnt, cache_trial_cnt, page_alloc_cnt, func_call_cnt);
-		printk("%s: p3 get_cache_t: %llu alloc_t: %llu add_t: %llu lock_cache_t: %llu", __func__, 
-			get_cache_time, cache_alloc_time, add_cache_time, lock_cache_time);
+		//printk("%s: p3 pgcache hit: %llu trial: %llu alloc_cnt: %llu call_cnt: %llu", __func__, 
+		//cache_hit_cnt, cache_trial_cnt, page_alloc_cnt, func_call_cnt);
+		//printk("%s: p3 get_cache_t: %llu alloc_t: %llu add_t: %llu lock_cache_t: %llu", __func__, 
+		//	get_cache_time, cache_alloc_time, add_cache_time, lock_cache_time);
 		last_t = cur_t;
 	}
 
@@ -2258,9 +2258,9 @@ struct page *pagecache_get_page_jw_p4(struct address_space *mapping, pgoff_t ind
 
 	unsigned long long cur_t = OS_TimeGetUS_4();
 	if (cur_t - last_t > 1000000) {
-		if (cache_trial_cnt > 0) 
-			printk("%s: p4 pgcache hit: %llu trial: %llu alloc: %llu lock_page: %llu", __func__, 
-			cache_hit_cnt, cache_trial_cnt, page_alloc_cnt, cache_alloc_time, lock_page_time);
+		//if (cache_trial_cnt > 0) 
+		//	printk("%s: p4 pgcache hit: %llu trial: %llu alloc: %llu lock_page: %llu", __func__, 
+		//	cache_hit_cnt, cache_trial_cnt, page_alloc_cnt, cache_alloc_time, lock_page_time);
 		last_t = cur_t;
 	}
 

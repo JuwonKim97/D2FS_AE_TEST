@@ -2,7 +2,7 @@
 
 
 WORKLOAD=fileserver
-FILEBENCH_PATH=/home/juwon/filebench/myworkload/$WORKLOAD.f
+FILEBENCH_PATH=/home/juwon/filebench
 MNT=/mnt
 
 DEV_whole=/dev/nvme3n1
@@ -83,7 +83,7 @@ main()
 			   echo 3 > /proc/sys/vm/drop_caches 
 			   sudo sysctl kernel.randomize_va_space=0;
 			   su root -c 'echo STARTTTTTT > /dev/kmsg'
-			   sudo /home/juwon/filebench/filebench -f $FILEBENCH_PATH 1> ${OUTPUTDIR_FS_JOB}/result.txt;
+			   sudo ${FILEBENCH_PATH}/filebench -f ${WORKLOAD}.f 1> ${OUTPUTDIR_FS_JOB}/result.txt;
 			   echo "==== Workload complete ===="
 			   echo "==== Process Result Data ===="
 			   echo $'\n'
@@ -99,13 +99,9 @@ main()
 			   cat ${OUTPUTDIR_FS_JOB}/result_time | awk 'BEGIN {t=5} {print t, $6/1000} {t+=5}' > ${OUTPUTDIR_FS_JOB}/kiops_sum
 			   rm ${OUTPUTDIR_FS_JOB}/result_time
 
-   	  		   echo "fb end";
-
 			   chown -R juwon ${OUTPUTDIR}
 
-
 			   echo "==== End the experiment ===="
-#dmesg > ${OUTPUTDIR_FS_JOB}/dmesg_aft_umount
 		   done
 	   	done
 		done
