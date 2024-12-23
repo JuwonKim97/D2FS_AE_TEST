@@ -53,9 +53,11 @@
 
 #undef PIN_NODE_PAGE
 
+#define RESERVE_RATIO	30/10
 #define NODE_READ_PIPELINE
 
 #undef MG_HANDLER_WRITE_NODE /* This is for handling varmail workload */
+
 
 enum {
 	FAULT_KMALLOC,
@@ -234,8 +236,6 @@ enum {
 #ifdef IPLFS_CALLBACK_IO
 #define DEF_MIGRATION_WAIT_TIME	100
 #define DEF_MIGRATION_WAIT_TIME_USEC	100
-#define RESERVE_RATIO	30/10
-//#define INTERVAL_RATIO	20/10 # ORIGINAL
 //#define INTERVAL_RATIO	14/10
 #define INTERVAL_RATIO	16/10
 #define VOLFS_WRITE_STALL
