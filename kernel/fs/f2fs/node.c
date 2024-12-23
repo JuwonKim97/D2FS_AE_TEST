@@ -27,6 +27,18 @@ static struct kmem_cache *free_nid_slab;
 static struct kmem_cache *nat_entry_set_slab;
 static struct kmem_cache *fsync_node_entry_slab;
 
+
+#ifdef GC_LATENCY
+unsigned long long OS_TimeGetUS___( void )
+{
+    struct timespec64 lTime;
+    ktime_get_coarse_real_ts64(&lTime);
+    return (lTime.tv_sec * 1000000 + div_u64(lTime.tv_nsec, 1000) );
+
+}
+#endif
+
+
 /*
  * Check whether the given nid is within node id range.
  */
@@ -34,9 +46,8 @@ int f2fs_check_nid_range(struct f2fs_sb_info *sbi, nid_t nid)
 {
 	if (unlikely(nid < F2FS_ROOT_INO(sbi) || nid >= NM_I(sbi)->max_nid)) {
 		set_sbi_flag(sbi, SBI_NEED_FSCK);
-		f2fs_warn(sbi, "%s: out-of-range nid=%x, run fsck to fix. max nid: %x",
-			  __func__, nid, NM_I(sbi)->max_nid);
-		dump_stack();
+		f2fs_warn(sbi, "%s: out-of-range nid=%x, run fsck to fix.",
+			  __func__, nid);
 		return -EFSCORRUPTED;
 	}
 	return 0;
@@ -426,7 +437,7 @@ static void cache_nat_entry(struct f2fs_sb_info *sbi, nid_t nid,
 		__free_nat_entry(new);
 }
 
-void set_node_addr(struct f2fs_sb_info *sbi, struct node_info *ni,
+static void set_node_addr(struct f2fs_sb_info *sbi, struct node_info *ni,
 			block_t new_blkaddr, bool fsync_done)
 {
 	struct f2fs_nm_info *nm_i = NM_I(sbi);
@@ -467,62 +478,8 @@ void set_node_addr(struct f2fs_sb_info *sbi, struct node_info *ni,
 		nat_set_version(e, inc_node_version(version));
 	}
 
-//#define BUF_CNT_	10
-//	static int glb_cnt = 0;
-//	static uint32_t glb_cid_stack[BUF_CNT_];
-//	static uint32_t glb_old_stack[BUF_CNT_];
-//	static uint32_t glb_new_stack[BUF_CNT_];
-//
-//    if ((nat_get_blkaddr(e) & 0xe0000000) == 0xe0000000 ||
-//        (new_blkaddr & 0xe0000000) == 0xe0000000 ) {
-////	if (true) {
-//		f2fs_bug_on(sbi, e->ni.nid != ni->nid);
-//        glb_cid_stack[glb_cnt] = ni->nid;
-//        glb_old_stack[glb_cnt] = nat_get_blkaddr(e);
-//        glb_new_stack[glb_cnt] = new_blkaddr;
-//        glb_cnt ++;
-//        if (glb_cnt == BUF_CNT_) {
-//            printk("%s \n \
-//                    nid: %u old_lpn: 0x%llx new_lpn: 0x%llx \n \
-//                    nid: %u old_lpn: 0x%llx new_lpn: 0x%llx \n \
-//                    nid: %u old_lpn: 0x%llx new_lpn: 0x%llx \n \
-//                    nid: %u old_lpn: 0x%llx new_lpn: 0x%llx \n \
-//                    nid: %u old_lpn: 0x%llx new_lpn: 0x%llx \n \
-//                    nid: %u old_lpn: 0x%llx new_lpn: 0x%llx \n \
-//                    nid: %u old_lpn: 0x%llx new_lpn: 0x%llx \n \
-//                    nid: %u old_lpn: 0x%llx new_lpn: 0x%llx \n \
-//                    nid: %u old_lpn: 0x%llx new_lpn: 0x%llx \n \
-//                    nid: %u old_lpn: 0x%llx new_lpn: 0x%llx \
-//                    ", __func__,
-//                    glb_cid_stack[0], glb_old_stack[0], glb_new_stack[0],
-//                    glb_cid_stack[1], glb_old_stack[1], glb_new_stack[1],
-//                    glb_cid_stack[2], glb_old_stack[2], glb_new_stack[2],
-//                    glb_cid_stack[3], glb_old_stack[3], glb_new_stack[3],
-//                    glb_cid_stack[4], glb_old_stack[4], glb_new_stack[4],
-//                    glb_cid_stack[5], glb_old_stack[5], glb_new_stack[5],
-//                    glb_cid_stack[6], glb_old_stack[6], glb_new_stack[6],
-//                    glb_cid_stack[7], glb_old_stack[7], glb_new_stack[7],
-//                    glb_cid_stack[8], glb_old_stack[8], glb_new_stack[8],
-//                    glb_cid_stack[9], glb_old_stack[9], glb_new_stack[9]
-//                    //old_stack[10], new_stack[10],
-//                    //old_stack[11], new_stack[11],
-//                    //old_stack[12], new_stack[12],
-//                    //old_stack[13], new_stack[13],
-//                    //old_stack[14], new_stack[14],
-//                    //old_stack[15], new_stack[15],
-//                    //old_stack[16], new_stack[16],
-//                    //old_stack[17], new_stack[17],
-//                    //old_stack[18], new_stack[18],
-//                    //old_stack[19], new_stack[19]
-//            );
-//            glb_cnt = 0;
-//        }
-//    }
 	/* change address */
 	nat_set_blkaddr(e, new_blkaddr);
-	//if (new_blkaddr != 0xffffffff) // && (new_blkaddr & 0xe0000000) == 0xe0000000) 
-	//	printk("nat_set_blkaddr: nid: %u new_blkaddr: 0x%lx", ni->nid, new_blkaddr);
-
 	if (!__is_valid_data_blkaddr(new_blkaddr))
 		set_nat_flag(e, IS_CHECKPOINTED, false);
 	__set_nat_cache_dirty(nm_i, e);
@@ -769,7 +726,6 @@ got:
 	return level;
 }
 
-
 /*
  * Caller should call f2fs_put_dnode(dn).
  * Also, it should grab and release a rwsem by calling f2fs_lock_op() and
@@ -811,7 +767,7 @@ int f2fs_get_dnode_of_data(struct dnode_of_data *dn, pgoff_t index, int mode)
 		nids[1] = get_nid(parent, offset[0], true);
 	dn->inode_page = npage[0];
 	dn->inode_page_locked = true;
-	
+
 	/* get indirect or direct nodes */
 	for (i = 1; i <= level; i++) {
 		bool done = false;
@@ -882,6 +838,224 @@ release_out:
 	}
 	return err;
 }
+
+int f2fs_get_dnode_of_data_jwgc_p3(struct dnode_of_data *dn, pgoff_t index, int mode)
+{
+	struct f2fs_sb_info *sbi = F2FS_I_SB(dn->inode);
+	struct page *npage[4];
+	struct page *parent = NULL;
+	int offset[4];
+	unsigned int noffset[4];
+	nid_t nids[4];
+	int level, i = 0;
+	int err = 0;
+
+	level = get_node_path(dn->inode, index, offset, noffset);
+	if (level < 0)
+		return level;
+
+	nids[0] = dn->inode->i_ino;
+	npage[0] = dn->inode_page;
+
+	if (!npage[0]) {
+		npage[0] = f2fs_get_node_page_p3_get_dnode(sbi, nids[0], i);
+		if (IS_ERR(npage[0]))
+			return PTR_ERR(npage[0]);
+	}
+
+	/* if inline_data is set, should not report any block indices */
+	if (f2fs_has_inline_data(dn->inode) && index) {
+		err = -ENOENT;
+		f2fs_put_page(npage[0], 1);
+		goto release_out;
+	}
+
+	parent = npage[0];
+	if (level != 0)
+		nids[1] = get_nid(parent, offset[0], true);
+	dn->inode_page = npage[0];
+	dn->inode_page_locked = true;
+
+	/* get indirect or direct nodes */
+	for (i = 1; i <= level; i++) {
+		bool done = false;
+
+		if (!nids[i] && mode == ALLOC_NODE) {
+			/* alloc new node */
+			if (!f2fs_alloc_nid(sbi, &(nids[i]))) {
+				err = -ENOSPC;
+				goto release_pages;
+			}
+
+			dn->nid = nids[i];
+			npage[i] = f2fs_new_node_page(dn, noffset[i]);
+			if (IS_ERR(npage[i])) {
+				f2fs_alloc_nid_failed(sbi, nids[i]);
+				err = PTR_ERR(npage[i]);
+				goto release_pages;
+			}
+
+			set_nid(parent, offset[i - 1], nids[i], i == 1);
+			f2fs_alloc_nid_done(sbi, nids[i]);
+			done = true;
+		} else if (mode == LOOKUP_NODE_RA && i == level && level > 1) {
+			npage[i] = f2fs_get_node_page_ra(parent, offset[i - 1]);
+			if (IS_ERR(npage[i])) {
+				err = PTR_ERR(npage[i]);
+				goto release_pages;
+			}
+			done = true;
+		}
+		if (i == 1) {
+			dn->inode_page_locked = false;
+			unlock_page(parent);
+		} else {
+			f2fs_put_page(parent, 1);
+		}
+
+		if (!done) {
+			npage[i] = f2fs_get_node_page_p3_get_dnode(sbi, nids[i], i);
+			if (IS_ERR(npage[i])) {
+				err = PTR_ERR(npage[i]);
+				f2fs_put_page(npage[0], 0);
+				goto release_out;
+			}
+		}
+		if (i < level) {
+			parent = npage[i];
+			nids[i + 1] = get_nid(parent, offset[i], false);
+		}
+	}
+	dn->nid = nids[level];
+	dn->ofs_in_node = offset[level];
+	dn->node_page = npage[level];
+	dn->data_blkaddr = f2fs_data_blkaddr(dn);
+	return 0;
+
+release_pages:
+	f2fs_put_page(parent, 1);
+	if (i > 1)
+		f2fs_put_page(npage[0], 0);
+release_out:
+	dn->inode_page = NULL;
+	dn->node_page = NULL;
+	if (err == -ENOENT) {
+		dn->cur_level = i;
+		dn->max_level = level;
+		dn->ofs_in_node = offset[level];
+	}
+	return err;
+}
+
+int f2fs_get_dnode_of_data_jwgc_p4(struct dnode_of_data *dn, pgoff_t index, int mode)
+{
+	struct f2fs_sb_info *sbi = F2FS_I_SB(dn->inode);
+	struct page *npage[4];
+	struct page *parent = NULL;
+	int offset[4];
+	unsigned int noffset[4];
+	nid_t nids[4];
+	int level, i = 0;
+	int err = 0;
+
+	level = get_node_path(dn->inode, index, offset, noffset);
+	if (level < 0)
+		return level;
+
+	nids[0] = dn->inode->i_ino;
+	npage[0] = dn->inode_page;
+
+	if (!npage[0]) {
+		npage[0] = f2fs_get_node_page_p4_get_dnode(sbi, nids[0], i);
+		if (IS_ERR(npage[0]))
+			return PTR_ERR(npage[0]);
+	}
+
+	/* if inline_data is set, should not report any block indices */
+	if (f2fs_has_inline_data(dn->inode) && index) {
+		err = -ENOENT;
+		f2fs_put_page(npage[0], 1);
+		goto release_out;
+	}
+
+	parent = npage[0];
+
+	if (level != 0)
+		nids[1] = get_nid(parent, offset[0], true);
+	dn->inode_page = npage[0];
+	dn->inode_page_locked = true;
+
+	/* get indirect or direct nodes */
+	for (i = 1; i <= level; i++) {
+		bool done = false;
+
+		if (!nids[i] && mode == ALLOC_NODE) {
+			/* alloc new node */
+			if (!f2fs_alloc_nid(sbi, &(nids[i]))) {
+				err = -ENOSPC;
+				goto release_pages;
+			}
+
+			dn->nid = nids[i];
+			npage[i] = f2fs_new_node_page(dn, noffset[i]);
+			if (IS_ERR(npage[i])) {
+				f2fs_alloc_nid_failed(sbi, nids[i]);
+				err = PTR_ERR(npage[i]);
+				goto release_pages;
+			}
+
+			set_nid(parent, offset[i - 1], nids[i], i == 1);
+			f2fs_alloc_nid_done(sbi, nids[i]);
+			done = true;
+		} else if (mode == LOOKUP_NODE_RA && i == level && level > 1) {
+			npage[i] = f2fs_get_node_page_ra(parent, offset[i - 1]);
+			if (IS_ERR(npage[i])) {
+				err = PTR_ERR(npage[i]);
+				goto release_pages;
+			}
+			done = true;
+		}
+		if (i == 1) {
+			dn->inode_page_locked = false;
+			unlock_page(parent);
+		} else {
+			f2fs_put_page(parent, 1);
+		}
+
+		if (!done) {
+			npage[i] = f2fs_get_node_page_p4_get_dnode(sbi, nids[i], i);
+			if (IS_ERR(npage[i])) {
+				err = PTR_ERR(npage[i]);
+				f2fs_put_page(npage[0], 0);
+				goto release_out;
+			}
+		}
+		if (i < level) {
+			parent = npage[i];
+			nids[i + 1] = get_nid(parent, offset[i], false);
+		}
+	}
+	dn->nid = nids[level];
+	dn->ofs_in_node = offset[level];
+	dn->node_page = npage[level];
+	dn->data_blkaddr = f2fs_data_blkaddr(dn);
+	return 0;
+
+release_pages:
+	f2fs_put_page(parent, 1);
+	if (i > 1)
+		f2fs_put_page(npage[0], 0);
+release_out:
+	dn->inode_page = NULL;
+	dn->node_page = NULL;
+	if (err == -ENOENT) {
+		dn->cur_level = i;
+		dn->max_level = level;
+		dn->ofs_in_node = offset[level];
+	}
+	return err;
+}
+
 
 static int truncate_node(struct dnode_of_data *dn)
 {
@@ -1352,16 +1526,12 @@ static int read_node_page(struct page *page, int op_flags)
 	}
 
 	err = f2fs_get_node_info(sbi, page->index, &ni);
-	if (err){
-		//printk("%s: 1. err: %d", __func__, err);
+	if (err)
 		return err;
-	}
 
 	if (unlikely(ni.blk_addr == NULL_ADDR) ||
 			is_sbi_flag_set(sbi, SBI_IS_SHUTDOWN)) {
 		ClearPageUptodate(page);
-			//printk("%s: 2. %d %d", __func__, ni.blk_addr == NULL_ADDR, 
-		//		is_sbi_flag_set(sbi, SBI_IS_SHUTDOWN));
 		return -ENOENT;
 	}
 
@@ -1399,6 +1569,292 @@ void f2fs_ra_node_page(struct f2fs_sb_info *sbi, nid_t nid)
 	err = read_node_page(apage, REQ_RAHEAD);
 	f2fs_put_page(apage, err ? 1 : 0);
 }
+
+void f2fs_ra_gc_node_page(struct f2fs_sb_info *sbi, nid_t nid)
+{
+	struct page *apage;
+	int err;
+
+	if (!nid)
+		return;
+	if (f2fs_check_nid_range(sbi, nid))
+		return;
+
+	apage = xa_load(&NODE_MAPPING(sbi)->i_pages, nid);
+	if (apage)
+		return;
+
+	apage = f2fs_grab_cache_page(NODE_MAPPING(sbi), nid, false);
+	if (!apage)
+		return;
+
+	sbi->total_gc_read_blk ++;
+	err = read_node_page(apage, REQ_RAHEAD);
+	f2fs_put_page(apage, err ? 1 : 0);
+}
+
+static struct page *__get_node_page_jw_gc_isalive(struct f2fs_sb_info *sbi, pgoff_t nid,
+					struct page *parent, int start)
+{
+	struct page *page;
+	int err;
+#ifdef GC_LATENCY
+	unsigned long long read_start_t, read_end_t;
+#endif
+
+	if (!nid)
+		return ERR_PTR(-ENOENT);
+	if (f2fs_check_nid_range(sbi, nid))
+		return ERR_PTR(-EINVAL);
+repeat:
+#ifdef GC_LATENCY
+	sbi->isalive_inode_read_trial_cnt ++;
+	read_start_t = OS_TimeGetUS___();
+#endif
+	page = f2fs_grab_cache_page_jw_gc_iget(NODE_MAPPING(sbi), nid, false);
+	if (!page)
+		return ERR_PTR(-ENOMEM);
+#ifdef GC_LATENCY
+	read_end_t = OS_TimeGetUS___();
+	sbi->gc_isalive_grab_cache += read_end_t - read_start_t;
+	read_start_t = OS_TimeGetUS___();
+#endif
+	err = read_node_page(page, 0);
+
+#ifdef GC_LATENCY
+	read_end_t = OS_TimeGetUS___();
+	sbi->gc_isalive_read_inode += read_end_t - read_start_t;
+#endif
+
+	if (err < 0) {
+		f2fs_put_page(page, 1);
+		return ERR_PTR(err);
+	} else if (err == LOCKED_PAGE) {
+		err = 0;
+#ifdef GC_LATENCY
+		sbi->isalive_inode_read_page_hit_cnt ++;
+#endif
+		goto page_hit;
+	}
+
+	if (parent)
+		f2fs_ra_node_pages(parent, start + 1, MAX_RA_NODE);
+#ifdef GC_LATENCY
+	read_start_t = OS_TimeGetUS___();
+#endif
+
+	lock_page(page);
+
+#ifdef GC_LATENCY
+	read_end_t = OS_TimeGetUS___();
+	sbi->gc_isalive_lock_inode_page += read_end_t - read_start_t;
+#endif
+
+	if (unlikely(page->mapping != NODE_MAPPING(sbi))) {
+		f2fs_put_page(page, 1);
+		printk("%s: unexpected !!!!!!!!!!!!! goto repeat", __func__);
+		goto repeat;
+	}
+
+	if (unlikely(!PageUptodate(page))) {
+		err = -EIO;
+		goto out_err;
+	}
+
+	if (!f2fs_inode_chksum_verify(sbi, page)) {
+		err = -EFSBADCRC;
+		goto out_err;
+	}
+page_hit:
+	if(unlikely(nid != nid_of_node(page))) {
+		f2fs_warn(sbi, "inconsistent node block, nid:%lu, node_footer[nid:%u,ino:%u,ofs:%u,cpver:%llu,blkaddr:%u]",
+			  nid, nid_of_node(page), ino_of_node(page),
+			  ofs_of_node(page), cpver_of_node(page),
+			  next_blkaddr_of_node(page));
+		err = -EINVAL;
+out_err:
+		ClearPageUptodate(page);
+		f2fs_put_page(page, 1);
+		return ERR_PTR(err);
+	}
+	return page;
+}
+
+
+static struct page *__get_node_page_p3_get_dnode(struct f2fs_sb_info *sbi, pgoff_t nid,
+					struct page *parent, int start, int level)
+{
+	struct page *page;
+	int err;
+#ifdef GC_LATENCY
+	unsigned long long read_start_t, read_end_t;
+#endif
+	int i = level;
+
+	if (!nid)
+		return ERR_PTR(-ENOENT);
+	if (f2fs_check_nid_range(sbi, nid))
+		return ERR_PTR(-EINVAL);
+repeat:
+#ifdef GC_LATENCY
+	sbi->p3_get_dnode_trial_cnt[i] ++;
+	read_start_t = OS_TimeGetUS___();
+#endif
+	page = f2fs_grab_cache_page(NODE_MAPPING(sbi), nid, false);
+	if (!page)
+		return ERR_PTR(-ENOMEM);
+#ifdef GC_LATENCY
+	read_end_t = OS_TimeGetUS___();
+	sbi->p3_get_dnode_grab_cache[i] += read_end_t - read_start_t;
+	read_start_t = OS_TimeGetUS___();
+#endif
+	err = read_node_page(page, 0);
+
+
+#ifdef GC_LATENCY
+	read_end_t = OS_TimeGetUS___();
+	sbi->p3_get_dnode_read_node[i] += read_end_t - read_start_t;
+#endif
+
+	if (err < 0) {
+		f2fs_put_page(page, 1);
+		return ERR_PTR(err);
+	} else if (err == LOCKED_PAGE) {
+		err = 0;
+#ifdef GC_LATENCY
+		sbi->p3_get_dnode_read_hit_cnt[i] ++;
+#endif
+		goto page_hit;
+	}
+
+	if (parent)
+		f2fs_ra_node_pages(parent, start + 1, MAX_RA_NODE);
+
+#ifdef GC_LATENCY
+	read_start_t = OS_TimeGetUS___();
+#endif
+	lock_page(page);
+#ifdef GC_LATENCY
+	read_end_t = OS_TimeGetUS___();
+	sbi->p3_lock_dnode_page[i] += read_end_t - read_start_t;
+#endif
+
+	if (unlikely(page->mapping != NODE_MAPPING(sbi))) {
+		f2fs_put_page(page, 1);
+		goto repeat;
+	}
+
+	if (unlikely(!PageUptodate(page))) {
+		err = -EIO;
+		goto out_err;
+	}
+
+	if (!f2fs_inode_chksum_verify(sbi, page)) {
+		err = -EFSBADCRC;
+		goto out_err;
+	}
+page_hit:
+	if(unlikely(nid != nid_of_node(page))) {
+		f2fs_warn(sbi, "inconsistent node block, nid:%lu, node_footer[nid:%u,ino:%u,ofs:%u,cpver:%llu,blkaddr:%u]",
+			  nid, nid_of_node(page), ino_of_node(page),
+			  ofs_of_node(page), cpver_of_node(page),
+			  next_blkaddr_of_node(page));
+		err = -EINVAL;
+out_err:
+		ClearPageUptodate(page);
+		f2fs_put_page(page, 1);
+		return ERR_PTR(err);
+	}
+	return page;
+}
+
+static struct page *__get_node_page_p4_get_dnode(struct f2fs_sb_info *sbi, pgoff_t nid,
+					struct page *parent, int start, int level)
+{
+	struct page *page;
+	int err;
+#ifdef GC_LATENCY
+	unsigned long long read_start_t, read_end_t;
+#endif
+	int i = level;
+
+	if (!nid)
+		return ERR_PTR(-ENOENT);
+	if (f2fs_check_nid_range(sbi, nid))
+		return ERR_PTR(-EINVAL);
+repeat:
+#ifdef GC_LATENCY
+	sbi->p4_get_dnode_trial_cnt[i] ++;
+	read_start_t = OS_TimeGetUS___();
+#endif
+	page = f2fs_grab_cache_page(NODE_MAPPING(sbi), nid, false);
+	if (!page)
+		return ERR_PTR(-ENOMEM);
+#ifdef GC_LATENCY
+	read_end_t = OS_TimeGetUS___();
+	sbi->p4_get_dnode_grab_cache[i] += read_end_t - read_start_t;
+	read_start_t = OS_TimeGetUS___();
+#endif
+	err = read_node_page(page, 0);
+
+
+#ifdef GC_LATENCY
+	read_end_t = OS_TimeGetUS___();
+	sbi->p4_get_dnode_read_node[i] += read_end_t - read_start_t;
+#endif
+
+	if (err < 0) {
+		f2fs_put_page(page, 1);
+		return ERR_PTR(err);
+	} else if (err == LOCKED_PAGE) {
+		err = 0;
+#ifdef GC_LATENCY
+		sbi->p4_get_dnode_read_hit_cnt[i] ++;
+#endif
+		goto page_hit;
+	}
+
+	if (parent)
+		f2fs_ra_node_pages(parent, start + 1, MAX_RA_NODE);
+
+#ifdef GC_LATENCY
+	read_start_t = OS_TimeGetUS___();
+#endif
+	lock_page(page);
+#ifdef GC_LATENCY
+	read_end_t = OS_TimeGetUS___();
+	sbi->p4_lock_dnode_page[i] += read_end_t - read_start_t;
+#endif
+
+	if (unlikely(page->mapping != NODE_MAPPING(sbi))) {
+		f2fs_put_page(page, 1);
+		goto repeat;
+	}
+
+	if (unlikely(!PageUptodate(page))) {
+		err = -EIO;
+		goto out_err;
+	}
+
+	if (!f2fs_inode_chksum_verify(sbi, page)) {
+		err = -EFSBADCRC;
+		goto out_err;
+	}
+page_hit:
+	if(unlikely(nid != nid_of_node(page))) {
+		f2fs_warn(sbi, "inconsistent node block, nid:%lu, node_footer[nid:%u,ino:%u,ofs:%u,cpver:%llu,blkaddr:%u]",
+			  nid, nid_of_node(page), ino_of_node(page),
+			  ofs_of_node(page), cpver_of_node(page),
+			  next_blkaddr_of_node(page));
+		err = -EINVAL;
+out_err:
+		ClearPageUptodate(page);
+		f2fs_put_page(page, 1);
+		return ERR_PTR(err);
+	}
+	return page;
+}
+
 
 static struct page *__get_node_page(struct f2fs_sb_info *sbi, pgoff_t nid,
 					struct page *parent, int start)
@@ -1449,7 +1905,6 @@ page_hit:
 			  nid, nid_of_node(page), ino_of_node(page),
 			  ofs_of_node(page), cpver_of_node(page),
 			  next_blkaddr_of_node(page));
-		//panic("%s: inconsistent node block panic\n", __func__);
 		err = -EINVAL;
 out_err:
 		ClearPageUptodate(page);
@@ -1458,6 +1913,23 @@ out_err:
 	}
 	return page;
 }
+
+struct page *f2fs_get_node_page_jw_gc_isalive(struct f2fs_sb_info *sbi, pgoff_t nid)
+{
+	return __get_node_page_jw_gc_isalive(sbi, nid, NULL, 0);
+}
+
+struct page *f2fs_get_node_page_p3_get_dnode(struct f2fs_sb_info *sbi, pgoff_t nid, int level)
+{
+	return __get_node_page_p3_get_dnode(sbi, nid, NULL, 0, level);
+}
+
+
+struct page *f2fs_get_node_page_p4_get_dnode(struct f2fs_sb_info *sbi, pgoff_t nid, int level)
+{
+	return __get_node_page_p4_get_dnode(sbi, nid, NULL, 0, level);
+}
+
 
 struct page *f2fs_get_node_page(struct f2fs_sb_info *sbi, pgoff_t nid)
 {
@@ -1670,117 +2142,12 @@ static int __write_node_page(struct page *page, bool atomic, bool *submitted,
 
 	if (do_balance)
 		f2fs_balance_fs(sbi, false);
-#ifdef MG_HANDLER_WRITE_NODE
-		atomic_inc(&sbi->written_node);
-#endif
 	return 0;
 
 redirty_out:
 	redirty_page_for_writepage(wbc, page);
 	return AOP_WRITEPAGE_ACTIVATE;
 }
-
-#ifdef MG_HANDLER_WRITE_NODE
-
-static int __mg_write_node_page(struct page *page, bool atomic, bool *submitted,
-				struct writeback_control *wbc, bool do_balance,
-				enum iostat_type io_type, unsigned int *seq_id, 
-				nid_t nid, struct node_info *ni)
-{
-	struct f2fs_sb_info *sbi = F2FS_P_SB(page);
-	struct f2fs_io_info fio = {
-		.sbi = sbi,
-		.ino = ino_of_node(page),
-		.type = NODE,
-		.op = REQ_OP_WRITE,
-		.op_flags = wbc_to_write_flags(wbc),
-		.page = page,
-		.encrypted_page = NULL,
-		.submitted = false,
-		.io_type = io_type,
-		.io_wbc = wbc,
-	};
-	unsigned int seq;
-
-	trace_f2fs_writepage(page, NODE);
-
-	/* get old block addr of this node page */
-	f2fs_bug_on(sbi, page->index != nid);
-
-	down_read(&sbi->node_write);
-
-	/* This page is already truncated */
-	if (unlikely(ni->blk_addr == NULL_ADDR)) {
-		ClearPageUptodate(page);
-		dec_page_count(sbi, F2FS_DIRTY_NODES);
-		up_read(&sbi->node_write);
-		unlock_page(page);
-		return 0;
-	}
-
-	if (__is_valid_data_blkaddr(ni->blk_addr) &&
-		!f2fs_is_valid_blkaddr(sbi, ni->blk_addr,
-					DATA_GENERIC_ENHANCE)) {
-		up_read(&sbi->node_write);
-		goto redirty_out;
-	}
-
-	if (atomic && !test_opt(sbi, NOBARRIER))
-		fio.op_flags |= REQ_PREFLUSH | REQ_FUA;
-
-	/* should add to global list before clearing PAGECACHE status */
-	if (f2fs_in_warm_node_list(sbi, page)) {
-		seq = f2fs_add_fsync_node_entry(sbi, page);
-		if (seq_id)
-			*seq_id = seq;
-	}
-
-	set_page_writeback(page);
-	ClearPageError(page);
-
-	fio.old_blkaddr = ni->blk_addr;
-	f2fs_do_write_node_page(nid, &fio);
-	set_node_addr(sbi, ni, fio.new_blkaddr, is_fsync_dnode(page));
-	dec_page_count(sbi, F2FS_DIRTY_NODES);
-	up_read(&sbi->node_write);
-
-	//if (wbc->for_reclaim) {
-	//	f2fs_submit_merged_write_cond(sbi, NULL, page, 0, NODE);
-	//	submitted = NULL;
-	//}
-	if (PageDirty(page)) {
-		printk("%s: page is still dirty", __func__);
-		f2fs_bug_on(sbi, 1);
-	}
-
-	unlock_page(page);
-
-	if (unlikely(f2fs_cp_error(sbi))) {
-		f2fs_submit_merged_write(sbi, NODE);
-		submitted = NULL;
-	}
-	if (submitted)
-		*submitted = fio.submitted;
-
-	if (do_balance)
-		f2fs_balance_fs(sbi, false);
-	return 0;
-
-redirty_out:
-	redirty_page_for_writepage(wbc, page);
-	return AOP_WRITEPAGE_ACTIVATE;
-}
-
-int mg_write_node_page(struct page *page, bool *submitted, struct writeback_control *wbc,
-		nid_t nid, struct node_info *ni)
-{
-	//if (is_cold_node(page))
-	//	printk("%s: unexpected!!!!!!! cold node!", __func__);
-	return __mg_write_node_page(page, false, submitted, wbc, false,
-						FS_NODE_IO, NULL, nid, ni);
-
-}
-#endif
 
 int f2fs_move_node_page(struct page *node_page, int gc_type)
 {
@@ -1839,10 +2206,7 @@ int f2fs_fsync_node_pages(struct f2fs_sb_info *sbi, struct inode *inode,
 	nid_t ino = inode->i_ino;
 	int nr_pages;
 	int nwritten = 0;
-	//nid_t nid;
-#ifdef FSYNC_LAT
-	unsigned long long tstart, tend;
-#endif
+
 	if (atomic) {
 		last_page = last_fsync_dnode(sbi, ino);
 		if (IS_ERR_OR_NULL(last_page))
@@ -1886,17 +2250,8 @@ continue_unlock:
 				/* someone wrote it for us */
 				goto continue_unlock;
 			}
-#ifdef FSYNC_LAT
-			tstart = OS_TimeGetNS();
-#endif
+
 			f2fs_wait_on_page_writeback(page, NODE, true, true);
-#ifdef FSYNC_LAT
-			tend = OS_TimeGetNS();
-			spin_lock(&sbi->lat_lock);
-			sbi->fsync_node_wrt_cnt ++;
-			sbi->fsync_node_wrt_lat += (tend - tstart);
-			spin_unlock(&sbi->lat_lock);
-#endif
 
 			set_fsync_mark(page, 0);
 			set_dentry_mark(page, 0);
@@ -1918,11 +2273,6 @@ continue_unlock:
 			if (!clear_page_dirty_for_io(page))
 				goto continue_unlock;
 
-			
-			/*nid = nid_of_node(page);
-			if (nid == 7)
-				printk("[JW DBG] %s: nid 7 bef __write_node_page\n", __func__);
-			*/
 			ret = __write_node_page(page, atomic &&
 						page == last_page,
 						&submitted, wbc, true,
@@ -1933,9 +2283,6 @@ continue_unlock:
 				break;
 			} else if (submitted) {
 				nwritten++;
-#ifdef MG_HANDLER_WRITE_NODE
-				atomic_inc(&sbi->synced_node);
-#endif
 			}
 
 			if (page == last_page) {
@@ -2053,7 +2400,7 @@ continue_unlock:
 
 int f2fs_sync_node_pages(struct f2fs_sb_info *sbi,
 				struct writeback_control *wbc,
-				bool do_balance, enum iostat_type io_type)//, int* nid7_synced)
+				bool do_balance, enum iostat_type io_type)
 {
 	pgoff_t index;
 	struct pagevec pvec;
@@ -2061,7 +2408,7 @@ int f2fs_sync_node_pages(struct f2fs_sb_info *sbi,
 	int nwritten = 0;
 	int ret = 0;
 	int nr_pages, done = 0;
-	//nid_t nid;
+
 	pagevec_init(&pvec);
 
 next_step:
@@ -2141,12 +2488,6 @@ write_node:
 			set_fsync_mark(page, 0);
 			set_dentry_mark(page, 0);
 
-			/*nid = nid_of_node(page);
-			if (nid == 7){
-				printk("[JW DBG] %s: nid 7 bef __write_node_page\n", __func__);
-				*nid7_synced = 1;
-			}
-			*/
 			ret = __write_node_page(page, false, &submitted,
 						wbc, do_balance, io_type, NULL);
 			if (ret)
@@ -2231,7 +2572,7 @@ static int f2fs_write_node_pages(struct address_space *mapping,
 	struct f2fs_sb_info *sbi = F2FS_M_SB(mapping);
 	struct blk_plug plug;
 	long diff;
-	//int tmpint = 0;
+
 	if (unlikely(is_sbi_flag_set(sbi, SBI_POR_DOING)))
 		goto skip_write;
 
@@ -2253,8 +2594,7 @@ static int f2fs_write_node_pages(struct address_space *mapping,
 
 	diff = nr_pages_to_write(sbi, NODE, wbc);
 	blk_start_plug(&plug);
-	//printk("[JW DBG] %s: AM I?\n", __func__);
-	f2fs_sync_node_pages(sbi, wbc, true, FS_NODE_IO);//, &tmpint);
+	f2fs_sync_node_pages(sbi, wbc, true, FS_NODE_IO);
 	blk_finish_plug(&plug);
 	wbc->nr_to_write = max((long)0, wbc->nr_to_write - diff);
 

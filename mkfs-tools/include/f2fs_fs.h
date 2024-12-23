@@ -430,12 +430,6 @@ enum {
 	CURSEG_HOT_NODE,	/* direct node blocks of directory files */
 	CURSEG_WARM_NODE,	/* direct node blocks of normal files */
 	CURSEG_COLD_NODE,	/* indirect node blocks */
-//	CURSEG_COLD_DATA=0,	/* multimedia or GCed data blocks */
-//	CURSEG_COLD_NODE,	/* indirect node blocks */
-//	CURSEG_HOT_NODE,	/* direct node blocks of directory files */
-//	CURSEG_WARM_NODE,	/* direct node blocks of normal files */
-//	CURSEG_HOT_DATA,	/* directory entry blocks */
-//	CURSEG_WARM_DATA,	/* data blocks */
 	NO_CHECK_TYPE
 };
 
@@ -485,11 +479,6 @@ enum {
 #define F2FS_FEATURE_INODE_CHKSUM	0x0020
 
 #define MAX_VOLUME_NAME		512
-#define IPLFS_MIGRATION_IO
-
-#ifdef IPLFS_MIGRATION_IO
-#define RESERVE_RATIO	30/10
-#endif
 
 /*
  * For superblock
@@ -568,10 +557,8 @@ struct f2fs_checkpoint {
 	/* information of current data segments */
 	__le32 cur_data_segno[MAX_ACTIVE_DATA_LOGS];
 	__le16 cur_data_blkoff[MAX_ACTIVE_DATA_LOGS];
-	/* TODO: need to include curseg migration */
 	__le32 ckpt_flags;		/* Flags : umount and journal_present */
 	__le32 cp_pack_total_block_count;	/* total # of one cp pack */
-	__le32 discard_journal_block_count;	/*IFLBA: discard journal blk cnt*/
 	__le32 cp_pack_start_sum;	/* start block number of data summary */
 	__le32 valid_node_count;	/* Total number of valid nodes */
 	__le32 valid_inode_count;	/* Total number of valid inodes */
@@ -793,17 +780,10 @@ struct f2fs_nat_block {
 	((le16_to_cpu((raw_sit)->vblocks) & ~SIT_VBLOCKS_MASK)	\
 	 >> SIT_VBLOCKS_SHIFT)
 
-struct f2fs_old_sit_entry {
+struct f2fs_sit_entry {
 	__le16 vblocks;				/* reference above */
 	__u8 valid_map[SIT_VBLOCK_MAP_SIZE];	/* bitmap for valid blocks */
 	__le64 mtime;				/* segment age for cleaning */
-} __attribute__((packed));
-
-struct f2fs_sit_entry {
-	__le16 vblocks;				/* reference above */
-	//__u8 valid_map[SIT_VBLOCK_MAP_SIZE];	/* bitmap for valid blocks */
-	//__le64 mtime;				/* segment age for cleaning */
-	__le64 segno;
 } __attribute__((packed));
 
 struct f2fs_sit_block {
@@ -845,9 +825,6 @@ struct f2fs_summary {
 /* summary block type, node or data, is stored to the summary_footer */
 #define SUM_TYPE_NODE		(1)
 #define SUM_TYPE_DATA		(0)
-#ifdef IPLFS_CALLBACK_IO
-#define SUM_TYPE_MIGRATION		(2)
-#endif
 
 struct summary_footer {
 	unsigned char entry_type;	/* SUM_TYPE_XXX */
@@ -924,56 +901,6 @@ struct f2fs_summary_block {
 	struct f2fs_journal journal;
 	struct summary_footer footer;
 } __attribute__((packed));
-
-/* discard journal for IFLBA F2FS */
-#define DISCARD_BLOCK_MAP_SIZE 64
-struct discard_journal_bitmap{
-	__le32 start_blkaddr;
-	unsigned char discard_map[DISCARD_BLOCK_MAP_SIZE];
-} __attribute__((packed));
-
-struct discard_journal_range {
-	__le32 start_blkaddr;
-	__le32 len;
-} __attribute__((packed));
-
-enum {
-	DJ_BLOCK_BITMAP,
-	DJ_BLOCK_RANGE
-};
-
-struct discard_journal_block_info {
-	unsigned char type; 	/* bitmap or range */
-	__le32 entry_cnt;	/* number of bitmap or number of range */
-} __attribute__((packed));
-
-#define DJ_BLOCK_FREE_SPACE (F2FS_BLKSIZE - sizeof(struct discard_journal_block_info)) 
-
-#define DJ_BITMAP_ENTRIES_IN_DJ_BLOCK (DJ_BLOCK_FREE_SPACE / \
-				sizeof(struct discard_journal_bitmap) )
-
-#define DJ_RANGE_ENTRIES_IN_DJ_BLOCK (DJ_BLOCK_FREE_SPACE / \
-				sizeof(struct discard_journal_range) )
-
-struct discard_journal_block{
-	struct discard_journal_block_info dj_block_info;
-	union {	
-		struct discard_journal_bitmap bitmap_entries[DJ_BITMAP_ENTRIES_IN_DJ_BLOCK];
-		struct discard_journal_range range_entries[DJ_RANGE_ENTRIES_IN_DJ_BLOCK];
-	}
-} __attribute__((packed));
-
-#define DISCARD_JOURNAL_BITMAP_BLOCKS(discard_seg_cnt)	\
-	(discard_seg_cnt % DJ_BITMAP_ENTRIES_IN_DJ_BLOCK ? \
-	 	discard_seg_cnt / DJ_BITMAP_ENTRIES_IN_DJ_BLOCK + 1  : \
-		discard_seg_cnt / DJ_BITMAP_ENTRIES_IN_DJ_BLOCK )
-
-#define DISCARD_RANGE_MAX_NUM 40
-
-#define DISCARD_JOURNAL_RANGE_BLOCKS(discard_range_cnt)	\
-	(discard_range_cnt % DJ_RANGE_ENTRIES_IN_DJ_BLOCK ? \
-	 	discard_range_cnt / DJ_RANGE_ENTRIES_IN_DJ_BLOCK + 1  : \
-		discard_range_cnt / DJ_RANGE_ENTRIES_IN_DJ_BLOCK )
 
 /*
  * For directory operations

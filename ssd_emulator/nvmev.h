@@ -361,7 +361,13 @@ struct nvmev_result {
 	unsigned int migration_cnt;
 };
 
-#ifdef MULTI_PARTITION_MTL
+//#ifdef MULTI_PARTITION_MTL
+#ifndef MULTI_PARTITION_MTL
+#define NO_TYPE			8
+#define NO_USER_PARTITION	8	/* # of meta + data partition */
+#endif
+
+#ifndef MULTI_PARTITION_MTL
 #define NO_TYPE			8
 
 #define PARTITION_SIZE		0x20000000
@@ -370,13 +376,13 @@ struct nvmev_result {
 #define LOCAL_PARTITION_BITS		(PARTITION_BITS - SSD_PARTITION_BITS)
 #define LOCAL_PARTITION_SIZE		(PARTITION_SIZE / SSD_PARTITIONS)
 
-#define	WINDOW_EXT_RATE		16/10
+#define	WINDOW_EXT_RATE		3
+#define	IM_WINDOW_EXT_RATE		6	/* interval mapping's extension rate for consuming same mem with IM */
+//#define	IM_WINDOW_EXT_RATE		18	/* for fio 600s */
 #define MEM_EXT_RATE		1
 #define INVALID_MAPPING		NULL
 #define MAX_KMALLOC_SIZE	MB(1)
 #define MTL_ZONE_SIZE		(MAX_KMALLOC_SIZE - sizeof(struct mtl_zone_info))
-
-#define	IM_WINDOW_EXT_RATE		6	/* interval mapping's extension rate for consuming same mem with IM */
 
 #ifdef ZONE_MAPPING
 
@@ -427,7 +433,6 @@ struct nvmev_result {
 #define NZONES_PER_PARTITION(sp)	(sp.tt_lines * WINDOW_EXT_RATE)
 //#define NZONES_PER_GC_PARTITION(sp)	(sp.tt_lines)
 #define NZONES_PER_GC_PARTITION(sp)	(sp.tt_lines * WINDOW_EXT_RATE)
-#define START_OFS_IN_MAIN_PART	0x100
 
 #endif
 
@@ -457,19 +462,33 @@ struct mtl_zone_entry {
 
 #endif
 
-#ifdef COUPLED_GC
+//#ifndef COUPLED_GC
+//struct gc_log {
+//	uint64_t old_lpn;		/* key */
+//	uint64_t new_lpn;
+//	//enum gc_log_status status;
+//	char status;
+//	struct list_elem list_elem;	/* buffered or inflight gc log list entry */
+//	struct hlist_node hnode;	/* aimless entry */
+//#ifdef GC_LOG_MERGE
+//	struct hlist_node hnode_merge;
+//#endif
+//};
+//#endif
+
+
+//#ifdef COUPLED_GC
 #define HBITS_AIMLESS_TRANSLATOR 18
 #define PGS_PER_FS_SEGMENT		512
 #define	NO_INIT_GC_LOG			(PGS_PER_FS_SEGMENT * 1024)
 
-#ifdef MIGRATION_IO
+//#ifdef MIGRATION_IO
 #define HBITS_INFLIGHT_GC_LOG_HTABLE	8
 //#define MIGRATION_THRESHOLD		(2 * 1024)
 //#define MIGRATION_THRESHOLD		(2*1024 * 1024)
 #define MIGRATION_THRESHOLD		(512 * 1024)
-//#define RATIO_OF_GC_LOG_TO_PAGE_MAP		0	/* Percent */
-#define RATIO_OF_GC_LOG_TO_PAGE_MAP		0	/* Percent */
-#endif
+#define RATIO_OF_GC_LOG_TO_PAGE_MAP		40	/* Percent */
+//#endif
 
 //enum gc_log_status {
 //	GC_LOG_FREE,
@@ -535,13 +554,12 @@ struct gc_log_mgmt {
 	uint64_t next_command_id;	
 	uint64_t completed_command_id;	
 	struct inflight_set_entry ise_array[NR_INFLIGHT_SET];
-	uint64_t n_log_completed;
 #endif
 #ifdef MG_HANDLER_DISABLED
 	struct list unhandled_gc_log_list;
 #endif
 };
-#endif
+//#endif
 
 #ifdef COUPLED_GC_MTL
 /* migration log */
@@ -624,42 +642,33 @@ struct nvmev_ns {
 	unsigned long long write_volume_gc; /* 4KB Blocks */
 	unsigned long long total_write_volume_host; /* 4KB Blocks */
 	unsigned long long total_write_volume_gc; /* 4KB Blocks */
+#ifdef HOST_GC_OVERHEAD_ANALYSIS                                            
+    unsigned long long last_t_host_gc_analy;                                
+    uint64_t req_cnt;       /* user request count during time interval */
+#endif                                                                      
+#endif
+#ifdef CHIP_UTIL
+    unsigned long long last_t_chip_util;                                
 #endif
 #ifdef MG_CMD_CNT
 	unsigned long long mg_cmd_cnt; 
 	unsigned long long total_mg_cmd_cnt; 
-	unsigned long long total_completed_mg_cmd_cnt; 
 	unsigned long long discarded_gc_log;
 #endif
 #ifdef CMD_CNT
 	unsigned long long total_write_blks_host; 
-	unsigned long long total_write_main_blks_host; 
 	unsigned long long total_read_blks_host; 
 	unsigned long long total_discard_cmds_host; 
-	unsigned long long n_discard_blk;
 #endif
 	unsigned int n_gc_log_max; /* migration threshold */
 #ifdef EQUAL_IM_MEM
 	uint64_t mtl_redundant;
 #endif
-#ifdef GC_LATENCY
-	uint64_t gc_lat_sum;
-	uint64_t gc_sw_lat_sum;
-	uint64_t gc_cnt;
-	/* below is sum across all channel and chip. 
-	  So to get an average lat, you need to be divided by channels*chips */
-	uint64_t gc_read_op_lat_sum;
-	uint64_t gc_read_transfer_lat_sum;
-	uint64_t gc_write_op_lat_sum;
-	uint64_t gc_write_transfer_lat_sum;
-#endif
 #ifdef CHIP_UTIL
 	uint64_t nand_idle_t_sum;
-	uint64_t nand_active_t_sum; /* FS + GC */
-	uint64_t nand_gc_active_t_sum; /* GC only */
+	uint64_t nand_active_t_sum;
 	uint64_t avg_nand_idle_t_sum_total;
 	uint64_t avg_nand_active_t_sum_total;
-	unsigned long long last_t_chip_util;
 #endif
 };
 

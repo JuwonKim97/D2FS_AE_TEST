@@ -24,7 +24,7 @@
 #include <linux/highmem.h>
 #endif
 
-#ifdef GC_PRINT
+#ifdef SHIVAL2
 unsigned int total_valid_blks = 0;
 #endif
 
@@ -216,6 +216,9 @@ DEFINE_HASHTABLE(gc_log_merger_node, HBITS_AIMLESS_TRANSLATOR);
 #endif
 #endif
 
+#ifdef MIGRATION_IO
+//DEFINE_HASHTABLE(inflight_gc_log_htable, HBITS_INFLIGHT_GC_LOG_HTABLE);
+#endif
 
 void init_gc_log_mgmt(struct gc_log_mgmt *gclm)
 {
@@ -249,16 +252,20 @@ void init_gc_log_mgmt(struct gc_log_mgmt *gclm)
 	gclm->n_total = 0;
 
 	gclm->buffering_cnt = 0;
-#ifdef GC_LOG_MEM
 	gclm->buffering_trial_cnt = 0;
-#endif
 
 #ifdef MIGRATION_IO
 	int i;
+	//gclm->inflight_set_slab = kmem_cache_create("inflight_set", sizeof(struct inflight_set_entry), 0, 
+	//										SLAB_RECLAIM_ACCOUNT, NULL);
+	//NVMEV_ASSERT(gclm->inflight_set_slab);
+
+	//gclm->mg_batch_slab = kmem_cache_create("mg_batch", sizeof(struct mg_batch_entry), 0, 
+	//										SLAB_RECLAIM_ACCOUNT, NULL);
+	//NVMEV_ASSERT(gclm->mg_batch_slab);
 
 	gclm->next_command_id = 0;
 	gclm->completed_command_id = 0;
-	gclm->n_log_completed = 0;
 	gclm->n_ise = 0;
 
 	for (i = 0; i < NR_INFLIGHT_SET; i ++){
@@ -266,6 +273,7 @@ void init_gc_log_mgmt(struct gc_log_mgmt *gclm)
 		list_init(&gclm->ise_array[i].gc_log_list);
 	}
 
+	//hash_init(inflight_gc_log_htable);
 #endif
 #ifdef MG_HANDLER_DISABLED
 	list_init(&gclm->unhandled_gc_log_list);
@@ -310,12 +318,28 @@ void init_inflight_set(struct gc_log_mgmt *gclm, struct inflight_set_entry *ise,
 	gclm->next_command_id ++ ;
 	*cid = ise->command_id;
 	
+	//if (ise->command_id % 1000 == 0) {
+	//	printk("%s: command id: %u idx: %u", __func__, ise->command_id, 
+	//		ise->command_id % NR_INFLIGHT_SET);	
+
+	//}
+	//printk("%s: command id: %u idx: %u", __func__, ise->command_id, 
+	//		ise->command_id % NR_INFLIGHT_SET);	
 	list_init(&ise->gc_log_list);
 
+	//list_init(&ise->list_elem);
+	//INIT_HLIST_NODE(&ise->hnode);
+	
 	gclm->n_ise ++ ;
 }
-#endif
 
+/*void init_mg_batch(struct mg_batch_entry *mgbe, unsigned int cid)
+{
+	mgbe->command_id = cid;
+	mgbe->nr = 0;
+}*/
+#endif
+#endif
 static inline bool is_window_overflow(struct conv_ftl *conv_ftl, struct window_mgmt *wm)
 {
 	return (wm->tail_zoneno - wm->head_zoneno + 1 > wm->nzones_per_partition);
@@ -481,7 +505,7 @@ static inline void update_window_mgmt_for_discard(struct conv_ftl *conv_ftl, uin
 #endif
 	
 }
-#endif
+//#endif
 
 static inline bool out_of_partition(struct conv_ftl *conv_ftl, uint64_t local_lpn);
 
@@ -504,6 +528,26 @@ static inline struct ppa *get_zone_maptbl_ent(struct conv_ftl *conv_ftl, uint64_
 #endif
 
 	return &conv_ftl->maptbl[no_partition][zidx];
+}
+
+static void print_dbg_get_zone_maptbl_ent(struct conv_ftl *conv_ftl, uint64_t local_lpn, char* func)
+{
+	int no_partition = NO_LOCAL_PARTITION(local_lpn);
+
+#ifndef COUPLED_GC
+	uint64_t zidx = get_logical_zoneno(conv_ftl, local_lpn);
+	if (out_of_partition(conv_ftl, local_lpn)){
+		NVMEV_INFO("[JWDBG] %s  %s: local_lpn: 0x%llx zidx: %lld nzp: %ld pgsPline: %ld PSA: 0x%llx\n",
+					__func__, local_lpn, zidx, conv_ftl->nzones_per_partition,
+					conv_ftl->ssd->sp.pgs_per_line, LOCAL_PARTITION_START_ADDR(local_lpn));
+		NVMEV_ASSERT(0);
+	}
+	printk("%s %s: no_partition: %d zidx: %d", func, __func__, no_partition, zidx);
+#else
+	uint64_t zidx = get_zone_idx(conv_ftl, local_lpn);
+#endif
+
+	return;
 }
 
 static inline bool is_first_ppa_in_zone(struct ppa *ppa)
@@ -537,6 +581,23 @@ static inline void set_rmap_zone_ent(struct conv_ftl *conv_ftl, uint64_t local_l
 	    NVMEV_ASSERT(0);
 	}
 	wpp->curline->start_local_lpn = local_lpn;
+	//if (conv_ftl->no_part == 2 || conv_ftl->no_part == 3) {
+	/*
+	if ((wpp->curline->start_local_lpn & 0xe0000000) == 0x20000000) {
+		struct line_mgmt *lm = &conv_ftl->lm;
+		//printk("%s: ftlno: %d line: %p start_local_lpn: 0x%llx free lcnt: %u victim lcnt: %u full lcnt: %u tt lcnt: %u is_same: %d", 
+		//		__func__,
+		//	   conv_ftl->no_part, wpp->curline, wpp->curline->start_local_lpn, 
+		//	   lm->free_line_cnt, lm->victim_line_cnt, lm->full_line_cnt, 
+		//	   lm->tt_lines, 
+		//	   lm->free_line_cnt + lm->victim_line_cnt + lm->full_line_cnt == lm->tt_lines
+		//	   );
+		printk("%s: ftlno: %d line: %p start_local_lpn: 0x%llx", 
+				__func__,
+			   conv_ftl->no_part, wpp->curline, wpp->curline->start_local_lpn);
+	}
+	*/
+	//}
 }
 
 static struct ppa get_new_zone_for_append(struct conv_ftl *conv_ftl, uint32_t io_type, int no_partition)
@@ -597,27 +658,28 @@ static struct ppa get_new_zone(struct conv_ftl *conv_ftl, uint32_t io_type, int 
 	/* check wp is first when allocating new zone */
 	NVMEV_ASSERT(is_first_wp(wpp));
 #else
-	/* allocate another new zone */
-	/* do GC if there is not enough line */
+	if (wpp->curline->wpc > 0) {
+		/* allocate another new zone */
+		/* do GC if there is not enough line */
 #ifndef MULTI_PARTITION_FTL
-	forground_gc(conv_ftl);
+		forground_gc(conv_ftl);
 #elif defined COUPLED_GC_MTL
-	forground_gc(conv_ftl, no_partition, ret);
+		forground_gc(conv_ftl, no_partition, ret);
 #else
-	forground_gc(conv_ftl, no_partition);
+		forground_gc(conv_ftl, no_partition);
 #endif
-	wpp->curline = NULL;
-	wpp->curline = get_next_free_line(conv_ftl);
-	BUG_ON(!wpp->curline);
-	wpp->blk = wpp->curline->id;
-	if (!(wpp->blk >= 0 && wpp->blk < spp->blks_per_pl)){
-		struct line_mgmt *lm = &conv_ftl->lm;
-		printk("[JWDBG] %s: what the? line: %p wpblk: %u blks_per_pl: %d freelinecnt: %d\n",
-				__func__, wpp->curline, wpp->blk, spp->blks_per_pl, lm->free_line_cnt);
+		wpp->curline = NULL;
+		wpp->curline = get_next_free_line(conv_ftl);
+		BUG_ON(!wpp->curline);
+		wpp->blk = wpp->curline->id;
+		if (!(wpp->blk >= 0 && wpp->blk < spp->blks_per_pl)){
+			struct line_mgmt *lm = &conv_ftl->lm;
+			printk("[JWDBG] %s: what the? line: %p wpblk: %u blks_per_pl: %d freelinecnt: %d\n",
+					__func__, wpp->curline, wpp->blk, spp->blks_per_pl, lm->free_line_cnt);
 
+		}
+		check_addr(wpp->blk, spp->blks_per_pl);
 	}
-	check_addr(wpp->blk, spp->blks_per_pl);
-
 	ppa.ppa = 0;
 	ppa.g.ch = wpp->ch;
 	ppa.g.lun = wpp->lun;
@@ -645,6 +707,10 @@ static inline struct ppa calc_ppa_in_zone(struct conv_ftl *conv_ftl, uint64_t lo
 
 	uint64_t zone_ofs = get_zone_offset(conv_ftl, local_lpn);
 	uint32_t pg_per_oneshotpg, channel, lun, oneshotpg;
+#ifdef JWDBG_CONV_FTL
+	//printk("[JWDBG] %s: local_lpn: 0x%llx zofs: 0x%llx, zone size: 0x%lx\n",
+	//			 __func__, local_lpn, zone_ofs, conv_ftl->ssd->sp.pgs_per_line);
+#endif
 
 	pg_per_oneshotpg = zone_ofs & cpp->bitmask_pg_per_oneshotpg;
 	channel = (zone_ofs / cpp->divider_channel) & cpp->bitmask_channel;
@@ -652,6 +718,10 @@ static inline struct ppa calc_ppa_in_zone(struct conv_ftl *conv_ftl, uint64_t lo
 	//oneshotpg = (zone_ofs / cpp->divider_oneshotpg) & cpp->bitmask_oneshotpg;
 	oneshotpg = (zone_ofs / cpp->divider_oneshotpg) % cpp->remainder_oneshotpg;
 
+#ifdef JWDBG_CONV_FTL
+	//printk("[JWDBG] pg_per_ospg: 0x%x channel: 0x%x, lun: 0x%x zone size: 0x%x\n",
+	//			 pg_per_oneshotpg, channel, lun, oneshotpg);
+#endif	
 	ppa.g.ch = channel;
 	ppa.g.lun = lun;
 	ppa.g.pg = (oneshotpg * spp->pgs_per_oneshotpg) + pg_per_oneshotpg;
@@ -795,6 +865,7 @@ static inline bool invalidate_zone_maptbl_ent(struct conv_ftl *conv_ftl, uint64_
 	
 	if (line->ipc == spp->pgs_per_line) {
 		zone_map_ent = get_zone_maptbl_ent(conv_ftl, local_lpn);
+		//print_dbg_get_zone_maptbl_ent(conv_ftl, local_lpn, __func__);
 		//printk("%s: part: %d start lpn: 0x%lx ppa: 0x%lx line: 0x%lx", __func__, 
 		//	   conv_ftl->no_part, 
 		//	   LPN_FROM_LOCAL_LPN(line->start_local_lpn, conv_ftl->no_part, conv_ftl->ns->nr_parts),
@@ -810,6 +881,7 @@ static inline bool invalidate_zone_maptbl_ent(struct conv_ftl *conv_ftl, uint64_
 			conv_ftl->total_valid_zone_cnt --;
 
 		if (IS_GC_PARTITION(no_part)){
+			NVMEV_ASSERT(0);
 			struct window_mgmt *wm = &conv_ftl->wm[no_part];
 			//printk("%s: hello??????????", __func__);
 			if (wftl_test_and_clear_bit(get_zone_idx(conv_ftl, local_lpn), (char *) wm->zone_bitmap)) {
@@ -1051,20 +1123,16 @@ static void init_write_pointer(struct conv_ftl *conv_ftl, uint32_t io_type)
 	}
 
 	for (i = 0; i < n_partitions; i ++){
-
-		if ( (io_type == USER_IO && (IS_META_PARTITION(i) || IS_GC_PARTITION(i)) ) 
-					|| (io_type == GC_IO) ) {
-			curline = list_first_entry(&lm->free_line_list, struct line, entry);
-			list_del_init(&curline->entry);
-			lm->free_line_cnt--;
-			wpp[i].curline = curline;
-			wpp[i].blk = curline->id;
-		}
+		curline = list_first_entry(&lm->free_line_list, struct line, entry);
+		list_del_init(&curline->entry);
+		lm->free_line_cnt--;
 
 		/* wpp->curline is always our next-to-write super-block */
+		wpp[i].curline = curline;
 		wpp[i].ch = 0;
 		wpp[i].lun = 0;
 		wpp[i].pg = 0;
+		wpp[i].blk = curline->id;
 		wpp[i].pl = 0;
 	}
 #endif
@@ -1114,6 +1182,9 @@ static struct line *get_next_free_line(struct conv_ftl *conv_ftl)
 	list_del_init(&curline->entry);
 	lm->free_line_cnt--;
 	NVMEV_DEBUG("[%s] free_line_cnt %d\n",__FUNCTION__, lm->free_line_cnt);
+#ifdef LINE_PRINT
+	//printk("%s: new_line: %p free_line_cnt: %d", __func__, curline, lm->free_line_cnt);
+#endif
 	return curline;
 }
 
@@ -1291,17 +1362,17 @@ static void init_maptbl(struct conv_ftl *conv_ftl)
 	}
 #else
 	int no_type;
-#ifdef ZONE_MAPPING
-#ifdef JWDBG_CONV_FTL
+	#ifdef ZONE_MAPPING
+		#ifdef JWDBG_CONV_FTL
 	NVMEV_INFO("[JWDBG] %s: ssd total pgs: %ld capacity: %ld GB \n", 
 				__func__, spp->tt_pgs, spp->tt_pgs * spp->pgsz / 1024/1024 / 1024);
-#endif
+		#endif
 	/* metadata partition (page mapping) */
 	unsigned long meta_pgs = conv_ftl->npages_meta;
-#ifdef EQUAL_IM_MEM
+		#ifdef EQUAL_IM_MEM
 	unsigned long main_pgs = conv_ftl->npages_main;
 	uint64_t mem_consumption = 0;
-#endif
+		#endif
 	conv_ftl->maptbl[META_PARTITION] = vmalloc(sizeof(struct ppa) * meta_pgs);
 	for (i = 0; i < meta_pgs; i++) {
 	    conv_ftl->maptbl[META_PARTITION][i].ppa = UNMAPPED_PPA;
@@ -1312,24 +1383,24 @@ static void init_maptbl(struct conv_ftl *conv_ftl)
 	for (no_type = META_PARTITION + 1; no_type < NO_TYPE; no_type ++){
 		if (IS_HOST_PARTITION(no_type)) {
 			conv_ftl->maptbl[no_type] = vmalloc(sizeof(struct ppa) * nzones_per_partition);
-#ifdef EQUAL_IM_MEM
+		#ifdef EQUAL_IM_MEM
 			mem_consumption += (sizeof(struct ppa) * nzones_per_partition);
-#endif
+		#endif
 			for (i = 0; i < nzones_per_partition; i++) {
 				conv_ftl->maptbl[no_type][i].zone_start_ppa = UNMAPPED_ZONENO;
 			}
 		} else if (IS_GC_PARTITION(no_type)) {
 			conv_ftl->maptbl[no_type] = vmalloc(sizeof(struct ppa) * nzones_per_gc_partition);
-#ifdef EQUAL_IM_MEM
+		#ifdef EQUAL_IM_MEM
 			mem_consumption += (sizeof(struct ppa) * nzones_per_gc_partition);
-#endif
+		#endif
 			for (i = 0; i < nzones_per_gc_partition; i++) {
 				conv_ftl->maptbl[no_type][i].zone_start_ppa = UNMAPPED_ZONENO;
 			}
 		}
 	}
 
-#ifdef EQUAL_IM_MEM
+		#ifdef EQUAL_IM_MEM
 	uint64_t IM_mem = 0;
 	//for (no_type = META_PARTITION + 1; no_type < NO_TYPE_IM; no_type ++){
 	//	IM_mem += (sizeof(struct ppa) * main_pgs);
@@ -1343,16 +1414,16 @@ static void init_maptbl(struct conv_ftl *conv_ftl)
 	} else {
 		printk("%s: mem consumption higher than IM", __func__);
 	}
-#endif
+		#endif
 
-#else
+	#else
 	for (no_type = 0; no_type < NO_TYPE; no_type ++){
 		conv_ftl->maptbl[no_type] = vmalloc(sizeof(struct ppa) * spp->tt_pgs);
 		for (i = 0; i < spp->tt_pgs; i++) {
 		    conv_ftl->maptbl[no_type][i].ppa = UNMAPPED_PPA;
 		}
 	}
-#endif
+	#endif
 #endif
 }
 
@@ -1367,7 +1438,7 @@ static void init_rmap(struct conv_ftl *conv_ftl)
 	}
 }
 
-#ifdef COUPLED_GC
+//#ifdef COUPLED_GC
 static inline void init_window_mgmt(struct conv_ftl *conv_ftl)
 {
 	int i;
@@ -1403,14 +1474,14 @@ static inline void init_window_mgmt(struct conv_ftl *conv_ftl)
 		conv_ftl->wm[i].head_idx = 0;
 		conv_ftl->wm[i].tail_zoneno = NO_ZONE(conv_ftl, local_start_addr);
 		conv_ftl->wm[i].tail_idx = 0;
-		//printk("%s type: %d head_zoneno: %llu tail_zoneno: %llu next_local_lpn: %llu head_idx: %d tail_idx: %d nzones_per_partition: %lu", 
-		//		__func__, i, conv_ftl->wm[i].head_zoneno, conv_ftl->wm[i].tail_zoneno, 
-		//  		local_start_addr, conv_ftl->wm[i].head_idx, conv_ftl->wm[i].tail_idx, 
-		//		conv_ftl->wm[i].nzones_per_partition);
+		printk("%s type: %d head_zoneno: %llu tail_zoneno: %llu next_local_lpn: %llu head_idx: %d tail_idx: %d nzones_per_partition: %lu", 
+				__func__, i, conv_ftl->wm[i].head_zoneno, conv_ftl->wm[i].tail_zoneno, 
+		  		local_start_addr, conv_ftl->wm[i].head_idx, conv_ftl->wm[i].tail_idx, 
+				conv_ftl->wm[i].nzones_per_partition);
 #ifdef COUPLED_GC_PRINT
-		//printk("%s type: %d head_zoneno: %llu tail_zoneno: %llu next_local_lpn: %llu head_idx: %d tail_idx: %d", 
-		//		__func__, i, conv_ftl->wm[i].head_zoneno, conv_ftl->wm[i].tail_zoneno, 
-		//  		local_start_addr, conv_ftl->wm[i].head_idx, conv_ftl->wm[i].tail_idx);
+		printk("%s type: %d head_zoneno: %llu tail_zoneno: %llu next_local_lpn: %llu head_idx: %d tail_idx: %d", 
+				__func__, i, conv_ftl->wm[i].head_zoneno, conv_ftl->wm[i].tail_zoneno, 
+		  		local_start_addr, conv_ftl->wm[i].head_idx, conv_ftl->wm[i].tail_idx);
 #endif
 		if (IS_GC_PARTITION(i)) {
 			wftl_set_bit(get_zone_idx(conv_ftl, conv_ftl->wm[i].next_local_lpn), 
@@ -1419,24 +1490,18 @@ static inline void init_window_mgmt(struct conv_ftl *conv_ftl)
 		}
 	}
 }
-#endif
+//#endif
 
-#ifndef COUPLED_GC
-static void conv_init_ftl(struct conv_ftl *conv_ftl, struct convparams *cpp, struct ssd *ssd)
-#else
 static void conv_init_ftl(struct conv_ftl *conv_ftl, struct convparams *cpp, struct ssd *ssd, uint32_t no_part, struct nvmev_ns *ns)
-#endif
 {
 	/*copy convparams*/
 	conv_ftl->cp = *cpp;
 
 	conv_ftl->ssd = ssd;
 
-#ifdef COUPLED_GC
 	conv_ftl->no_part = no_part;
 	conv_ftl->ns = ns;
 	printk("%s: conv ftl: no_part: %u", __func__, conv_ftl->no_part);
-#endif
 
 #ifdef ZONE_MAPPING
 	conv_ftl->npages_meta = NPAGES_META(ssd->sp);
@@ -1444,8 +1509,6 @@ static void conv_init_ftl(struct conv_ftl *conv_ftl, struct convparams *cpp, str
 	conv_ftl->npages_main = NPAGES_MAIN(ssd->sp); /* to equalize mem consumption with interval map*/
 #endif
 	conv_ftl->nzones_per_partition = NZONES_PER_PARTITION(ssd->sp);
-
-	/*TODO: need to disable VOP on nzones_per_gc_partition. */
 	conv_ftl->nzones_per_gc_partition = NZONES_PER_GC_PARTITION(ssd->sp);
 #endif
 
@@ -1468,14 +1531,16 @@ static void conv_init_ftl(struct conv_ftl *conv_ftl, struct convparams *cpp, str
 
 	init_write_flow_control(conv_ftl);
 
-#ifdef COUPLED_GC
+//#ifdef COUPLED_GC
 	init_window_mgmt(conv_ftl);
-#endif
+//#endif
 	int i;
+#ifdef MULTI_PARTITION_FTL
 	for (i = 0; i < NO_USER_PARTITION; i ++) {
 		conv_ftl->valid_zone_cnt[i] = 0;
 		conv_ftl->gc_free_zone_cnt[i] = 0;
 	}
+#endif
 	
 	NVMEV_INFO("Init FTL Instance with %d channels(%ld pages)\n",  conv_ftl->ssd->sp.nchs, conv_ftl->ssd->sp.tt_pgs);
 	conv_ftl->total_valid_zone_cnt = 0;
@@ -1490,13 +1555,10 @@ static void conv_init_params(struct convparams *cpp, struct ssdparams *spp)
 #endif
 {
 	cpp->op_area_pcent = OP_AREA_PERCENT;
-#ifdef COUPLED_GC
 	cpp->gc_thres_lines = 5; /* Need only two lines.(host write, gc)*/
 	cpp->gc_thres_lines_high = 5; /* Need only two lines.(host write, gc)*/
-#else
-	cpp->gc_thres_lines = 2; /* Need only two lines.(host write, gc)*/
-	cpp->gc_thres_lines_high = 2; /* Need only two lines.(host write, gc)*/
-#endif
+	//cpp->gc_thres_lines = 2; /* Need only two lines.(host write, gc)*/
+	//cpp->gc_thres_lines_high = 2; /* Need only two lines.(host write, gc)*/
 	cpp->enable_gc_delay = 1;
 	cpp->pba_pcent = (int)((1 + cpp->op_area_pcent) * 100);
 
@@ -1559,11 +1621,7 @@ void conv_init_namespace(struct nvmev_ns *ns, uint32_t id, uint64_t size, void *
 	for (i = 0; i < nr_parts; i++) {
 	    ssd = kmalloc(sizeof(struct ssd), GFP_KERNEL);
 	    ssd_init(ssd, &spp, cpu_nr_dispatcher);
-#ifndef COUPLED_GC
-	    conv_init_ftl(&conv_ftls[i], &cpp, ssd);
-#else
 	    conv_init_ftl(&conv_ftls[i], &cpp, ssd, i, ns);
-#endif
 	}
 
 
@@ -1588,24 +1646,6 @@ void conv_init_namespace(struct nvmev_ns *ns, uint32_t id, uint64_t size, void *
 	ns->proc_rev_io_cmd = conv_proc_nvme_rev_io_cmd;
 #endif
 
-#ifdef GC_LATENCY
-	ns->gc_lat_sum = 0;
-	ns->gc_sw_lat_sum = 0;
-	ns->gc_cnt = 0;
-
-	ns->gc_read_op_lat_sum = 0;
-	ns->gc_read_transfer_lat_sum = 0;
-	ns->gc_write_op_lat_sum = 0;
-	ns->gc_write_transfer_lat_sum = 0;
-#endif
-#ifdef CHIP_UTIL
-	ns->nand_idle_t_sum = 0;
-	ns->nand_active_t_sum = 0;
-	ns->nand_gc_active_t_sum = 0;
-	ns->avg_nand_idle_t_sum_total = 0;
-	ns->avg_nand_active_t_sum_total = 0;
-	ns->last_t_chip_util = 0;
-#endif
 	//ns->n_gc_log_max = ns->size / PAGE_SIZE * sizeof(uint64_t) / sizeof(struct gc_log) 
 	//	* RATIO_OF_GC_LOG_TO_PAGE_MAP / 100;
 	ns->n_gc_log_max = ns->size / PAGE_SIZE * sizeof(uint32_t) / 
@@ -1627,7 +1667,7 @@ void conv_init_namespace(struct nvmev_ns *ns, uint32_t id, uint64_t size, void *
 #endif
 #endif
 
-#ifdef MULTI_PARTITION_MTL
+//#ifdef MULTI_PARTITION_MTL
 
 #ifdef EQUAL_IM_MEM
 	uint64_t window_size_im, n_mtl_zones_im;
@@ -1642,6 +1682,7 @@ void conv_init_namespace(struct nvmev_ns *ns, uint32_t id, uint64_t size, void *
 	IM_mem += (sizeof(struct mtl_zone_entry) * n_mtl_zones_im * (NO_TYPE_IM-1 - 3));
 #endif
 
+#ifdef MULTI_PARTITION_MTL
 	/* JW: build memory mapping table */
 	ns->window_size = ns->size * WINDOW_EXT_RATE / PAGE_SIZE * sizeof(MTL_ENTRY);
 
@@ -1675,10 +1716,6 @@ void conv_init_namespace(struct nvmev_ns *ns, uint32_t id, uint64_t size, void *
 	n_mtl_gc_zones = n_mtl_zones;
 	ns->n_mtl_gc_zones = n_mtl_gc_zones;
 
-	printk("%s: gc log size: %u byte", __func__, 
-			(sizeof(struct gc_log) - sizeof(struct hlist_node)) / 2
-			 );
-
     for (i = 0; i < NO_TYPE; i++){
 		/* JW: init ith mtls */
 		/* TODO: need to redesign for meta mtl */
@@ -1686,7 +1723,7 @@ void conv_init_namespace(struct nvmev_ns *ns, uint32_t id, uint64_t size, void *
 			if ((ns->mtls[i] = kmalloc(sizeof(struct mtl_zone_entry *) * n_mtl_meta_zones , GFP_KERNEL)) == NULL)
 				NVMEV_ERROR("[JWDBG] kmalloc return NULL. %lld window chunk set sz: %lldKB\n", 
 								i, n_mtl_zones * sizeof(void *)/1024 );
-
+//
 			/* JW: init mtls in unit of MTL_ZONE_SIZE */
 			for (ii = 0; ii < n_mtl_meta_zones; ii++){
     			if ((ns->mtls[i][ii] = kmalloc(sizeof(struct mtl_zone_entry), GFP_KERNEL)) == NULL)
@@ -1757,34 +1794,41 @@ void conv_init_namespace(struct nvmev_ns *ns, uint32_t id, uint64_t size, void *
 	ns->write_volume_gc = 0;
 	ns->total_write_volume_host = 0;
 	ns->total_write_volume_gc = 0;
+#ifdef HOST_GC_OVERHEAD_ANALYSIS    
+    ns->last_t_host_gc_analy = 0;
+   	ns->req_cnt = 0;             
+#endif                              
 #endif
 #ifdef CHIP_UTIL
 	ns->last_t_chip_util = 0;
 #endif
+
 #ifdef MG_CMD_CNT
 	ns->mg_cmd_cnt = 0;
 	ns->total_mg_cmd_cnt = 0;
-	ns->total_completed_mg_cmd_cnt = 0;
 	ns->discarded_gc_log = 0;
 #endif
 
 #ifdef CMD_CNT
 	ns->total_write_blks_host = 0; 
-	ns->total_write_main_blks_host = 0; 
 	ns->total_read_blks_host = 0; 
 	ns->total_discard_cmds_host = 0; 
-	ns->n_discard_blk = 0;
+#endif
+#ifdef CHIP_UTIL
+	ns->nand_idle_t_sum = 0;
+	ns->nand_active_t_sum = 0;
+	ns->avg_nand_idle_t_sum_total = 0;
+	ns->avg_nand_active_t_sum_total = 0;
 #endif
 
 #ifdef EQUAL_IM_MEM
-	uint64_t htable_mem = 2 * (1<<HBITS_AIMLESS_TRANSLATOR) * sizeof(struct hlist_head);
-	uint64_t gc_log_mem = ns->n_gc_log_max * sizeof(struct gc_log);
-	gc_log_mem += (gc_log_mem * 4 / 100);
-	if (IM_mem > mem_consump + htable_mem + gc_log_mem) {
+	//uint64_t htable_mem = 2 * (1<<HBITS_AIMLESS_TRANSLATOR) * sizeof(struct hlist_head);
+	//uint64_t gc_log_mem = ns->n_gc_log_max * sizeof(struct gc_log);
+	//gc_log_mem += (gc_log_mem * 4 / 100);
+	if (IM_mem > mem_consump) {
 	//NVMEV_ASSERT(IM_mem > mem_consump + htable_mem + gc_log_mem);
-		printk("%s: mtl redundant: %u MB", __func__, (IM_mem-mem_consump-htable_mem-gc_log_mem)/1024/1024);
-		printk("%s: mtl redundant: %u MB", __func__, (htable_mem+gc_log_mem)/1024/1024);
-		ns->mtl_redundant = vmalloc(IM_mem - mem_consump - htable_mem - gc_log_mem);
+		printk("%s: mtl redundant: %u MB", __func__, (IM_mem-mem_consump)/1024/1024);
+		ns->mtl_redundant = vmalloc(IM_mem - mem_consump);
 		NVMEV_ASSERT(ns->mtl_redundant != NULL);
 	} else {
 		printk("%s: mem consumption higher than IM", __func__);
@@ -1860,7 +1904,7 @@ static void mark_page_invalid(struct conv_ftl *conv_ftl, struct ppa *ppa)
 	NVMEV_ASSERT(blk->vpc > 0 && blk->vpc <= spp->pgs_per_blk);
 	blk->vpc--;
 
-#ifdef GC_PRINT
+#ifdef SHIVAL2
 	total_valid_blks -= 1;
 #endif
 
@@ -1872,11 +1916,12 @@ static void mark_page_invalid(struct conv_ftl *conv_ftl, struct ppa *ppa)
 	NVMEV_ASSERT(line->ipc >= 0 && line->ipc < spp->pgs_per_line);
 
 #ifdef GURANTEE_SEQ_WRITE
-	if (line->wpc == spp->pgs_per_line && line->ipc == 0){
+	if ((line->wpc == spp->pgs_per_line && line->ipc == 0){
 	    was_full_line = true;
 	}
 #endif
-	if (line->wpc == spp->pgs_per_line && line->pos == 0) {
+	if (line->vpc == spp->pgs_per_line) {
+	    NVMEV_ASSERT(line->ipc == 0);
 	    was_full_line = true;
 	}
 	line->ipc++;
@@ -1918,6 +1963,7 @@ static void check_mark_page_valid(struct conv_ftl *conv_ftl, struct ppa *ppa, ui
 				__func__, LOCAL_PARTITION_START_ADDR(local_lpn), 
 				LOCAL_PARTITION_START_ADDR(local_lpn), LOCAL_PARTITION_START_ADDR(local_lpn), 
 				ppa->ppa, ppa->ppa,	pg->status);
+		print_dbg_get_zone_maptbl_ent(conv_ftl, local_lpn, __func__);
 	}
 	NVMEV_ASSERT(pg->status == PG_FREE);
 
@@ -1951,7 +1997,7 @@ static void mark_page_valid(struct conv_ftl *conv_ftl, struct ppa *ppa)
 #ifndef GURANTEE_SEQ_WRITE
 	line->wpc++;
 #endif
-#ifdef GC_PRINT
+#ifdef SHIVAL2
 	total_valid_blks += 1;
 #endif
 }
@@ -2002,7 +2048,6 @@ static uint64_t gc_write_meta_page(struct conv_ftl *conv_ftl, struct ppa *old_pp
 	struct ppa new_ppa;
 	uint64_t lpn = get_rmap_ent(conv_ftl, old_ppa);
 	int no_partition = NO_LOCAL_PARTITION(lpn);
-	struct nvmev_ns *ns = conv_ftl->ns;
 
 	NVMEV_ASSERT(valid_lpn(conv_ftl, lpn));
 	new_ppa = get_new_page(conv_ftl, GC_IO, no_partition);
@@ -2015,7 +2060,7 @@ static uint64_t gc_write_meta_page(struct conv_ftl *conv_ftl, struct ppa *old_pp
 
 	mark_page_valid(conv_ftl, &new_ppa);
 
-#ifdef GC_PRINT
+#ifdef SHIVAL2
 	total_valid_blks -= 1;
 #endif
 
@@ -2038,29 +2083,9 @@ static uint64_t gc_write_meta_page(struct conv_ftl *conv_ftl, struct ppa *old_pp
 	        gcw.cmd = NAND_WRITE;
 	        gcw.xfer_size = spp->pgsz * spp->pgs_per_oneshotpg;
 	    }
-
-#ifdef GC_LATENCY
-		uint64_t transfer_latency = 0, op_latency = 0;
-/* old gc latency measurement. need to check later. 
-		ssd_advance_nand_measure_latency(conv_ftl->ssd, &gcw, &transfer_latency, &op_latency);
-		if (transfer_latency != 0 && op_latency != 0){
-			ns->gc_write_op_lat_sum += op_latency;
-			ns->gc_write_transfer_lat_sum += transfer_latency;
-		}
-*/
 #ifdef CHIP_UTIL
-		uint64_t nand_idle_t = 0, nand_active_t = 0;
-		ssd_advance_nand_measure_latency(conv_ftl->ssd, &gcw, &transfer_latency, &op_latency, 
-				&nand_idle_t, &nand_active_t);
-		ns->nand_idle_t_sum += nand_idle_t;
-		ns->nand_active_t_sum += nand_active_t;
-		ns->nand_gc_active_t_sum += nand_active_t;
-#else
-		ssd_advance_nand_measure_latency(conv_ftl->ssd, &gcw, &transfer_latency, &op_latency);
-#endif
-		ns->gc_write_op_lat_sum += op_latency;
-		ns->gc_write_transfer_lat_sum += transfer_latency;
-
+	    ssd_advance_nand(conv_ftl->ssd, &gcw, 
+				&(conv_ftl->ns->nand_idle_t_sum), &(conv_ftl->ns->nand_active_t_sum));
 #else
 	    ssd_advance_nand(conv_ftl->ssd, &gcw);
 #endif
@@ -2396,16 +2421,21 @@ void load_gc_log_inflight(struct conv_ftl *conv_ftl, struct gc_log_mgmt *gclm, s
 {
 	int i, ii;
 	struct inflight_set_entry *ise;
+	//struct mg_batch_entry *mgbe;
 	unsigned int command_id;
 	struct list_elem *le;
 	struct gc_log *gc_log;
 
 	/* create a gc log set in a inflight list. The set consists of NR_MG_PAIR gc logs. */
 	ise = &gclm->ise_array[gclm->next_command_id % NR_INFLIGHT_SET];
-	
+	//printk("%s: nxt cid: %u ise cid: %u", __func__, gclm->next_command_id, ise->command_id);
 	NVMEV_ASSERT(ise->command_id == INVALID_COMMAND_ID);
 
+	//kmem_cache_alloc(gclm->inflight_set_slab, GFP_KERNEL);
 	init_inflight_set(gclm, ise, &command_id);
+	
+	//mgbe = kmem_cache_alloc(gclm->mg_batch_slab, GFP_KERNEL);
+	//init_mg_batch(mgbe, command_id);
 
 	/* group into a batch and insert to inflight list */
 	for (ii = 0; ii < NR_MG_PAIR; ii ++) {
@@ -2432,10 +2462,20 @@ void load_gc_log_inflight(struct conv_ftl *conv_ftl, struct gc_log_mgmt *gclm, s
 		/* insert the gc log into inflight set */
 		list_push_back(&ise->gc_log_list, le);
 	
+		/* reflect into the mg batch */
+	//	mgbe->mg_pairs[mgbe->nr].old_lba = gc_log->old_lpn;
+	//	mgbe->mg_pairs[mgbe->nr].new_lba = gc_log->new_lpn;
+	//	mgbe->nr ++ ;
 	}
+
 	
 	list_push_back(&ret->ise_list, &ise->list_elem);
 
+	/* insert an inflight set into a inflight_gc_log_htable */
+	//hash_add(inflight_gc_log_htable, &ise->hnode, ise->command_id);
+
+	/* insert an mg batch into a mg batch list */
+	//list_push_back(&ret->mg_batch_list, &mgbe->list_elem);
 
 }
 #endif
@@ -2593,17 +2633,14 @@ static inline bool dma_mg_pool_is_full(struct gc_log_mgmt *gclm)
 
 static inline bool need_to_send_migration_command(struct conv_ftl *conv_ftl)
 {
-	if  (conv_ftl->ns->gclm->n_buffered <= MIGRATION_LOGS_PER_CMD) {
-		return false;
-	}
-	
 	if (excess_buffered_gc_log(conv_ftl))
 		return true;	
-		
 	//if ((conv_ftl->ns->gclm->buffering_cnt % 1024 == 0) && 
 	//	  (conv_ftl->ns->gclm->n_buffered > MIGRATION_LOGS_PER_CMD))
 	//	return true;
-
+	if  (conv_ftl->ns->gclm->n_buffered <= MIGRATION_LOGS_PER_CMD) {
+		return false;
+	}
 	if (conv_ftl->valid_zone_cnt[HOT_DATA_PARTITION] >= MG_SEND_THRESHOLD(conv_ftl)) {
 		//printk("%s: 1. zcnt: %u thre: %u", __func__, 
 		//	conv_ftl->valid_zone_cnt[HOT_DATA_PARTITION], 
@@ -2644,7 +2681,6 @@ static uint64_t coupled_gc_write_page(struct conv_ftl *conv_ftl, struct ppa *old
 	uint64_t old_lpn, new_lpn;
 	old_local_lpn = get_rmap_ent(conv_ftl, old_ppa);
 	int no_partition = NO_LOCAL_PARTITION(old_local_lpn), no_dst_partition;
-	struct nvmev_ns *ns = conv_ftl->ns;
 
 	NVMEV_ASSERT(valid_lpn(conv_ftl, old_local_lpn));
 	if (IS_DATA_PARTITION(no_partition)){
@@ -2662,7 +2698,7 @@ static uint64_t coupled_gc_write_page(struct conv_ftl *conv_ftl, struct ppa *old
 	set_rmap_ent(conv_ftl, new_local_lpn, &new_ppa);
 
 	mark_page_valid(conv_ftl, &new_ppa);
-#ifdef GC_PRINT
+#ifdef SHIVAL2
 	total_valid_blks -= 1;
 #endif
 
@@ -2685,21 +2721,9 @@ static uint64_t coupled_gc_write_page(struct conv_ftl *conv_ftl, struct ppa *old
 	        gcw.xfer_size = spp->pgsz * spp->pgs_per_oneshotpg;
 	    }
 
-#ifdef GC_LATENCY
-		uint64_t transfer_latency = 0, op_latency = 0;
 #ifdef CHIP_UTIL
-		uint64_t nand_idle_t = 0, nand_active_t = 0;
-		ssd_advance_nand_measure_latency(conv_ftl->ssd, &gcw, &transfer_latency, &op_latency, 
-				&nand_idle_t, &nand_active_t);
-		ns->nand_idle_t_sum += nand_idle_t;
-		ns->nand_active_t_sum += nand_active_t;
-		ns->nand_gc_active_t_sum += nand_active_t;
-#else
-	    ssd_advance_nand_measure_latency(conv_ftl->ssd, &gcw, &transfer_latency, &op_latency);
-#endif
-		ns->gc_write_op_lat_sum += op_latency;
-		ns->gc_write_transfer_lat_sum += transfer_latency;
-
+	    ssd_advance_nand(conv_ftl->ssd, &gcw, 
+				&(conv_ftl->ns->nand_idle_t_sum), &(conv_ftl->ns->nand_active_t_sum));
 #else
 	    ssd_advance_nand(conv_ftl->ssd, &gcw);
 #endif
@@ -2721,10 +2745,8 @@ static uint64_t coupled_gc_write_page(struct conv_ftl *conv_ftl, struct ppa *old
 		if (need_to_send_migration_command(conv_ftl)) {
 				//) {
 			load_gc_log_inflight(conv_ftl, conv_ftl->ns->gclm, ret);
-#ifdef MG_CMD_CNT
 			conv_ftl->ns->mg_cmd_cnt ++;
 			conv_ftl->ns->total_mg_cmd_cnt ++;
-#endif
 		}
 	}
 #endif
@@ -2943,9 +2965,7 @@ lookup_translator:
 		
 
 		if (gc_log->status != GC_LOG_INFLIGHT) {
-#ifdef MG_CMD_CNT
 			conv_ftl->ns->discarded_gc_log ++;
-#endif
 			if (IS_GC_PARTITION(NO_PARTITION(gc_log->old_lpn))) {
 				dec_zone_remain_cnt(conv_ftl, 
 						LOCAL_LPN_FROM_LPN(gc_log->old_lpn, conv_ftl->ns->nr_parts));
@@ -3023,7 +3043,7 @@ static uint64_t gc_write_page(struct conv_ftl *conv_ftl, struct ppa *old_ppa)
 
 	mark_page_valid(conv_ftl, &new_ppa);
 
-#ifdef GC_PRINT
+#ifdef SHIVAL2
 	total_valid_blks -= 1;
 #endif
 
@@ -3051,7 +3071,12 @@ static uint64_t gc_write_page(struct conv_ftl *conv_ftl, struct ppa *old_ppa)
 	        gcw.xfer_size = spp->pgsz * spp->pgs_per_oneshotpg;
 	    }
 
+#ifdef CHIP_UTIL
+	    ssd_advance_nand(conv_ftl->ssd, &gcw, 
+				&(conv_ftl->ns->nand_idle_t_sum), &(conv_ftl->ns->nand_active_t_sum));
+#else
 	    ssd_advance_nand(conv_ftl->ssd, &gcw);
+#endif
 	}
 
 	/* advance per-ch gc_endtime as well */
@@ -3136,7 +3161,6 @@ static void clean_one_flashpg(struct conv_ftl *conv_ftl, struct ppa *ppa, struct
 	int cnt = 0, i = 0;
 	uint64_t completed_time = 0;
 	struct ppa ppa_copy = *ppa;
-	struct nvmev_ns *ns = conv_ftl->ns;
 
 	for (i = 0; i < spp->pgs_per_flashpg; i++) {
 	    pg_iter = get_pg(conv_ftl->ssd, &ppa_copy);
@@ -3161,23 +3185,9 @@ static void clean_one_flashpg(struct conv_ftl *conv_ftl, struct ppa *ppa, struct
 		gcr.xfer_size = spp->pgsz * cnt;
 		gcr.interleave_pci_dma = false;
 		gcr.ppa = &ppa_copy;
-#ifdef GC_LATENCY
-		uint64_t transfer_latency = 0, op_latency = 0;
-
 #ifdef CHIP_UTIL
-		uint64_t nand_idle_t = 0, nand_active_t = 0;
-		ssd_advance_nand_measure_latency(conv_ftl->ssd, &gcr, &transfer_latency, &op_latency, 
-				&nand_idle_t, &nand_active_t);
-		ns->nand_idle_t_sum += nand_idle_t;
-		ns->nand_active_t_sum += nand_active_t;
-		ns->nand_gc_active_t_sum += nand_active_t;
-#else
-		completed_time = ssd_advance_nand_measure_latency(conv_ftl->ssd, &gcr, 
-										&transfer_latency, &op_latency);
-#endif
-		ns->gc_read_op_lat_sum += op_latency;
-		ns->gc_read_transfer_lat_sum += transfer_latency;
-
+	    completed_time = ssd_advance_nand(conv_ftl->ssd, &gcr, 
+				&(conv_ftl->ns->nand_idle_t_sum), &(conv_ftl->ns->nand_active_t_sum));
 #else
 		completed_time = ssd_advance_nand(conv_ftl->ssd, &gcr);
 #endif
@@ -3219,6 +3229,22 @@ static void mark_line_free(struct conv_ftl *conv_ftl, struct ppa *ppa)
 	/* move this line to free line list */
 	list_add_tail(&line->entry, &lm->free_line_list);
 	lm->free_line_cnt++;
+#ifdef LINE_PRINT
+	/*
+	//printk("[JWDBG] %s: freed line: %p free_line_cnt: %d", __func__, line, lm->free_line_cnt);
+	if ((start_local_lpn & 0xe0000000) == 0x20000000) 
+	//if (conv_ftl->no_part == 2 || conv_ftl->no_part == 3) 
+	//	printk("%s: ftlno: %d freed line: %p start_local_lpn: 0x%llx free lcnt: %u victim lcnt: %u full lcnt: %u tt lcnt: %u is_same: %d", 
+	//			__func__, conv_ftl->no_part, 
+	//			line,  
+	//		start_local_lpn, lm->free_line_cnt, lm->victim_line_cnt, lm->full_line_cnt, 
+	//		lm->tt_lines, lm->free_line_cnt + lm->victim_line_cnt + lm->full_line_cnt == lm->tt_lines);
+		printk("%s: ftlno: %d freed line: %p start_local_lpn: 0x%llx", 
+				__func__, conv_ftl->no_part, 
+				line,  
+			start_local_lpn);
+	*/
+#endif
 }
 
 #ifdef WAF
@@ -3227,56 +3253,87 @@ static void mark_line_free(struct conv_ftl *conv_ftl, struct ppa *ppa)
 #define MSEC_IN_USEC 1000
 #define PRINT_TIME_SEC	1
 #define WAF_TIME_INTERVAL	(PRINT_TIME_SEC * SEC_IN_USEC)
-#define CHIP_UTIL_TIME_INTERVAL	(SEC_IN_USEC)
+#define HOST_GC_OVERHEAD_ANALYSIS_TIME_INTERVAL	(PRINT_TIME_SEC * SEC_IN_USEC)
+#define CHIP_UTIL_TIME_INTERVAL (PRINT_TIME_SEC * SEC_IN_USEC / 1)
 
 static inline void print_WAF(struct nvmev_ns *ns)
 {
 	if (ns->write_volume_host) {
-		//unsigned int waf = 
-		//	(100* (ns->write_volume_gc + ns->write_volume_host)) / ns->write_volume_host;
-		//unsigned int total_waf = 
-		//	(100* (ns->total_write_volume_gc + ns->total_write_volume_host)) 
+		//float waf = 
+		//	(float) ((float) (ns->write_volume_gc + ns->write_volume_host)) / ns->write_volume_host;
+		//float total_waf = 
+		//	(float) ((float) (ns->total_write_volume_gc + ns->total_write_volume_host)) 
 		//	/ ns->total_write_volume_host;
-		//printk("%s: WAF: %u percent gc: %llu KB write_req: %llu KB total: %llu total WAF: %u percent", 
-		//	__func__, waf, ns->write_volume_gc*4, ns->write_volume_host*4, 
-		//	ns->total_write_volume_host*4, total_waf);
-		//printk("%s: [KB] total_write_main_blks_host: %llu n_discard_blk: %llu W-D: %llu", 
-		//		__func__, ns->total_write_main_blks_host * 4, ns->n_discard_blk * 4, 
-		//		(ns->total_write_main_blks_host - ns->n_discard_blk)*4  );
+		unsigned int waf = 
+			(100* (ns->write_volume_gc + ns->write_volume_host)) / ns->write_volume_host;
+		unsigned int total_waf = 
+			(100* (ns->total_write_volume_gc + ns->total_write_volume_host)) 
+			/ ns->total_write_volume_host;
+		printk("%s: WAF: %u percent gc: %llu KB write_req: %llu KB total: %llu total WAF: %u percent", 
+			__func__, waf, ns->write_volume_gc*4, ns->write_volume_host*4, 
+			ns->total_write_volume_host*4, total_waf);
 	}
 }
 
-#ifdef GC_LATENCY
-static inline void print_GC_LATENCY(struct nvmev_ns *ns)
-{
-	//float waf = 
-	//	(float) ((float) (ns->write_volume_gc + ns->write_volume_host)) / ns->write_volume_host;
-	//float total_waf = 
-	//	(float) ((float) (ns->total_write_volume_gc + ns->total_write_volume_host)) 
-	//	/ ns->total_write_volume_host;
-	
-	struct conv_ftl *conv_ftl = &ns->ftls[0];
-	struct ssdparams *spp = &conv_ftl->ssd->sp;
-	
-	uint64_t avg_read_op_lat, avg_read_xfer_lat, avg_write_op_lat, avg_write_xfer_lat;
+//static inline void print_req_cnt(struct nvmev_ns *ns, unsigned long long t_intval) 
+//{                                                                                  
+//                                                                                   
+//       printk("%s: user_req_cnt: %llu time_interval: %llu",                        
+//               __func__, ns->req_cnt, t_intval);                                   
+//}                                                                                  
 
-	if (ns->gc_cnt > 0) {
-		avg_read_op_lat = ns->gc_read_op_lat_sum / (ns->gc_cnt * spp->nchs * spp->luns_per_ch);
-		avg_read_xfer_lat = ns->gc_read_transfer_lat_sum / (ns->gc_cnt * spp->nchs * spp->luns_per_ch);
-		avg_write_op_lat = ns->gc_write_op_lat_sum / (ns->gc_cnt * spp->nchs * spp->luns_per_ch);
-		avg_write_xfer_lat = ns->gc_write_transfer_lat_sum / (ns->gc_cnt * spp->nchs * spp->luns_per_ch);
-		uint64_t latency = ns->gc_lat_sum / ns->gc_cnt;
-		uint64_t sw_latency = ns->gc_sw_lat_sum / ns->gc_cnt;
-		printk("%s: latency: %llu (rd: %llu wrt: %llu) us.  SW_lat: %llu us. ", 
-				__func__,  latency / 1000, 
-				(avg_read_op_lat + avg_read_xfer_lat) / 1000, 
-				(avg_write_op_lat + avg_write_xfer_lat)/ 1000, 
-				sw_latency / 1000);
-		printk("%s: breakdown us. rd op: %llu wrt op: %llu read xfer: %llu write xfer: %llu", 
-				__func__, 
-				avg_read_op_lat / 1000, avg_write_op_lat / 1000, 
-				avg_read_xfer_lat / 1000,  avg_write_xfer_lat / 1000);
+#ifdef MG_CMD_CNT
+static inline void print_MG_CMD_CNT(struct nvmev_ns *ns)
+{
+	if (ns->total_mg_cmd_cnt) {
+		printk("%s: mg cmd submitted: %llu (per sec) total mg cmd: %llu", 
+			__func__, ns->mg_cmd_cnt/PRINT_TIME_SEC, ns->total_mg_cmd_cnt);
 	}
+}
+#endif
+
+#ifdef CMD_CNT
+static inline void print_CMD_CNT(struct nvmev_ns *ns)
+{
+	printk("%s: total transfer volume. write: %d KB read: %d KB discard: %d",
+		__func__, ns->total_write_blks_host * 4,
+		ns->total_read_blks_host * 4, ns->total_discard_cmds_host * 4);
+}
+#endif
+
+#ifdef GC_LOG_MEM
+static inline void print_GC_LOG_MEM(struct nvmev_ns *ns)
+{
+	unsigned int n_valid_gc_log = ns->gclm->n_buffered + ns->gclm->n_inflight;
+
+	/* disable merge so remove hlist node and to emulate 32bit, divide by 2 */
+	unsigned int gc_log_size = sizeof(struct gc_log) - sizeof(struct hlist_node);
+	gc_log_size /= 2;
+	unsigned int gc_log_mem_MB = n_valid_gc_log * gc_log_size / 1024 / 1024;
+
+	if (ns->gclm->buffering_trial_cnt) {
+		printk("%s: mem: %u MB gc log cnt (buffer/inflight): %u ( %u / %u ) merge ratio: %u / %u %u percent total: %u discard: %u submit: %u", 
+			__func__, gc_log_mem_MB, 
+			n_valid_gc_log, ns->gclm->n_buffered, ns->gclm->n_inflight, 
+			ns->gclm->buffering_trial_cnt - ns->gclm->buffering_cnt, 
+			ns->gclm->buffering_trial_cnt, 
+			(ns->gclm->buffering_trial_cnt - ns->gclm->buffering_cnt) * 100 
+			/ ns->gclm->buffering_trial_cnt , 
+			ns->gclm->buffering_trial_cnt, ns->discarded_gc_log, ns->total_mg_cmd_cnt * 256);
+	}
+	//int i = 0;
+	//struct conv_ftl *conv_ftls = (struct conv_ftl *)ns->ftls;
+	//for (i = 0; i < 4; i ++) {
+	//	struct conv_ftl *conv_ftl = &conv_ftls[i];
+	//	printk("%s: partno: %d node: %u data: %u gc node: %u gc data: %u thre: %u", 
+	//			__func__, i,
+	//		conv_ftl->valid_zone_cnt[HOT_NODE_PARTITION], 
+	//		conv_ftl->valid_zone_cnt[HOT_DATA_PARTITION],
+	//		conv_ftl->gc_free_zone_cnt[HOT_NODE_PARTITION],
+	//		conv_ftl->gc_free_zone_cnt[HOT_DATA_PARTITION],
+	//		MG_SEND_THRESHOLD(conv_ftl)
+	//	);
+	//}
 }
 #endif
 
@@ -3286,134 +3343,47 @@ static inline void print_CHIP_UTIL(struct nvmev_ns *ns)
 	struct conv_ftl *conv_ftl = &ns->ftls[0];
 	struct ssdparams *spp = &conv_ftl->ssd->sp;
 	static bool first_passed = false;
-	
-	uint64_t avg_nand_idle_t, avg_nand_active_t, avg_nand_gc_active_t;
+
+	uint64_t avg_nand_idle_t, avg_nand_active_t;
 
 	avg_nand_idle_t = ns->nand_idle_t_sum / (spp->nchs * spp->luns_per_ch);
 	avg_nand_active_t = ns->nand_active_t_sum / (spp->nchs * spp->luns_per_ch);
-	avg_nand_gc_active_t = ns->nand_gc_active_t_sum / (spp->nchs * spp->luns_per_ch);
 	if (!first_passed && avg_nand_active_t == 0)
 		return;
 	first_passed = true;
-	ns->avg_nand_idle_t_sum_total += avg_nand_idle_t;
-	ns->avg_nand_active_t_sum_total += avg_nand_active_t;
+	ns->avg_nand_idle_t_sum_total += avg_nand_idle_t; 
+	ns->avg_nand_active_t_sum_total += avg_nand_active_t; 
 	ns->nand_idle_t_sum = 0;
-	ns->nand_active_t_sum = 0;
-	ns->nand_gc_active_t_sum = 0;
-	//if (avg_nand_idle_t + avg_nand_active_t > 0)
-		//printk("%s: util: %llu %%  GC util: %llu %% FS util: %llu %% total util: %llu %% ", 
-		//		__func__,  
-		//		avg_nand_active_t * 100 / (avg_nand_idle_t + avg_nand_active_t), 
-		//		avg_nand_gc_active_t * 100 / (avg_nand_idle_t + avg_nand_active_t), 
-		//		(avg_nand_active_t - avg_nand_gc_active_t) * 100 
-		//			/ (avg_nand_idle_t + avg_nand_active_t), 
-		//		ns->avg_nand_active_t_sum_total * 100 
-		//			/ (ns->avg_nand_idle_t_sum_total + ns->avg_nand_active_t_sum_total)
-		//);	
-}
-#endif
-
-#ifdef MG_CMD_CNT
-static inline void print_MG_CMD_CNT(struct nvmev_ns *ns)
-{
-	if (ns->total_mg_cmd_cnt) {
-		printk("%s: mg cmd submitted: %llu (per sec) total mg cmd: %llu total completed mg cmd: %llu", 
-			__func__, ns->mg_cmd_cnt/PRINT_TIME_SEC, ns->total_mg_cmd_cnt, 
-			ns->total_completed_mg_cmd_cnt);
-	} else {
-		printk("%s: mg cmd submitted: %llu (per sec)", 
-			__func__, 0);
-	}
-}
-#endif
-
-#ifdef CMD_CNT
-static inline void print_CMD_CNT(struct nvmev_ns *ns)
-{
-	//printk("%s: total transfer volume. write: %d KB read: %d KB discard: %d KB migrate: %d KB",
-	//	__func__, ns->total_write_blks_host * 4,
-	//	ns->total_read_blks_host * 4, ns->total_discard_cmds_host * 4, 
-	//	ns->total_mg_cmd_cnt * 4);
-}
-#endif
-
-#ifdef GC_LOG_MEM
-static inline void print_GC_LOG_MEM(struct nvmev_ns *ns)
-{
-	unsigned int n_valid_gc_log = ns->gclm->n_buffered + ns->gclm->n_inflight;
-
-	/* disable gc log merging so remove hlist node and to emulate 32bit address in the SSD firmware, divide by 2 */
-	unsigned int gc_log_size = sizeof(struct gc_log) - sizeof(struct hlist_node);
-	gc_log_size /= 2;
-	unsigned int gc_log_mem_MB = n_valid_gc_log * gc_log_size / 1024 / 1024;
-
-	if (ns->gclm->buffering_trial_cnt) {
-		printk("%s: mem: %u MB migration record cnt (buffer/inflight): %u ( %u / %u ) total: %u discard: %u submit: %u completed: %u", 
-			__func__, gc_log_mem_MB, 
-			n_valid_gc_log, ns->gclm->n_buffered, ns->gclm->n_inflight, 
-			ns->gclm->buffering_trial_cnt, ns->discarded_gc_log, ns->total_mg_cmd_cnt * 256, ns->gclm->n_log_completed);
-	} else {
-		printk("%s: mem: %u MB ", 
-			__func__, 0 
-			);
-	}
-}
-#endif
-
-#ifdef PRINT_PART_UTIL
-static inline void print_part_util(struct nvmev_ns *ns)
-{
-	int i = 0;
-	struct conv_ftl *conv_ftls = (struct conv_ftl *)ns->ftls;
-	struct conv_ftl *conv_ftl;
-	unsigned int valid_zone_cnt[10] = {0}, total_zone_cnt[10] = {0}, util_per[10] = {0}, 
-				 free_zone_cnt[10] = {0};
-	static int timecnt = 0;
-	timecnt ++;
-	if (timecnt % 5 == 0) {
-		unsigned int total_inuse_zone_cnt = 0;
-
-		for (i = 0; i < 4; i ++) {
-			conv_ftl = &conv_ftls[i];
-			valid_zone_cnt[HOT_NODE_PARTITION] += conv_ftl->valid_zone_cnt[HOT_NODE_PARTITION]; 
-			valid_zone_cnt[HOT_DATA_PARTITION] += conv_ftl->valid_zone_cnt[HOT_DATA_PARTITION]; 
-			free_zone_cnt[COLD_DATA_PARTITION] += conv_ftl->wm[COLD_DATA_PARTITION].free_zone; 
-			free_zone_cnt[GC_PARTITION] += conv_ftl->wm[GC_PARTITION].free_zone;
-		}
-		
-		if (conv_ftl->nzones_per_partition > 0 && 
-			conv_ftl->nzones_per_gc_partition > 0) {
-			total_inuse_zone_cnt = 
-				conv_ftl->nzones_per_gc_partition - free_zone_cnt[COLD_DATA_PARTITION] / 4
-				+ conv_ftl->nzones_per_gc_partition - free_zone_cnt[GC_PARTITION] / 4;
-		}
-		
-		if (conv_ftl->nzones_per_partition > 0 && 
-			conv_ftl->nzones_per_gc_partition > 0) {
-			printk("section utilization of gc region: %u %%", 
-				100 * total_inuse_zone_cnt / conv_ftl->nzones_per_gc_partition
-			);
-
-		}
-	}
+	ns->nand_active_t_sum = 0; 
+	if (avg_nand_idle_t + avg_nand_active_t > 0) 
+		printk("%s: util: %llu %%  total util: %llu %% ", 
+				__func__, 
+				avg_nand_active_t * 100 / (avg_nand_idle_t + avg_nand_active_t),
+				ns->avg_nand_active_t_sum_total * 100 
+				/ (ns->avg_nand_idle_t_sum_total + ns->avg_nand_active_t_sum_total)
+			  );
 }
 #endif
 
 static inline void try_print_WAF(struct nvmev_ns *ns) {
 	unsigned long long cur_t = OS_TimeGetUS();
-
-#ifdef CHIP_UTIL
-       if (cur_t - ns->last_t_chip_util > CHIP_UTIL_TIME_INTERVAL) {
-		print_CHIP_UTIL(ns);
-               ns->last_t_chip_util = cur_t;                                        
-       }
+#ifdef HOST_GC_OVERHEAD_ANALYSIS                                                        
+    if (cur_t - ns->last_t_host_gc_analy > HOST_GC_OVERHEAD_ANALYSIS_TIME_INTERVAL) {
+            print_req_cnt(ns, cur_t - ns->last_t_host_gc_analy);                     
+            ns->req_cnt = 0;                                                         
+            ns->last_t_host_gc_analy = cur_t;                                        
+    }                                                                                
 #endif                                                                                  
+    
+#ifdef CHIP_UTIL
+    if (cur_t - ns->last_t_chip_util > CHIP_UTIL_TIME_INTERVAL) {
+		print_CHIP_UTIL(ns);
+            ns->last_t_chip_util = cur_t;                                        
+    }                                                                                
+#endif
 
 	if (cur_t - ns->last_t > WAF_TIME_INTERVAL) {
 		print_WAF(ns);
-#ifdef GC_LATENCY
-		print_GC_LATENCY(ns);
-#endif
 #ifdef MG_CMD_CNT
 		print_MG_CMD_CNT(ns);
 		ns->mg_cmd_cnt = 0;
@@ -3427,42 +3397,9 @@ static inline void try_print_WAF(struct nvmev_ns *ns) {
 		print_GC_LOG_MEM(ns);
 		ns->mg_cmd_cnt = 0;
 #endif
-
-#ifdef PRINT_PART_UTIL
-		print_part_util(ns);
-#endif
-
 		ns->last_t = cur_t;
 		ns->write_volume_host = 0;
 		ns->write_volume_gc = 0;
-
-
-
-#ifdef GC_PRINT
-		struct conv_ftl *conv_ftl, *conv_ftls = (struct conv_ftl *)ns->ftls;
-		int i, vlc = 0, flc = 0, frlc = 0;
-		for (i = 0; i < ns->nr_parts; i++) {
-			conv_ftl = &conv_ftls[i];
-			vlc += conv_ftl->lm.victim_line_cnt;
-			flc += conv_ftl->lm.full_line_cnt;
-			frlc += conv_ftl->lm.free_line_cnt;
-		}
-
-		printk("GC victim= %d full= %d free= %d total_vblks: %u (%u GB)", 
-		vlc, flc, frlc, 
-				total_valid_blks, 
-				total_valid_blks * 4 / 1024 / 1024);
-		//int i__;
-		//for (i__ = 0; i__ < NO_USER_PARTITION; i__ ++) {
-		//	printk("GC part: %d partition: %u vzone: %d / %lu gc free zone: %lu", 
-		//			conv_ftl->no_part, i__, conv_ftl->valid_zone_cnt[i__],
-		//			conv_ftl->nzones_per_partition, 
-		//			conv_ftl->gc_free_zone_cnt[i__]);
-		//}
-		//printk("%s: total valid zone cnt: %u", __func__, conv_ftl->total_valid_zone_cnt);
-#endif
-
-
 	}
 }
 
@@ -3506,13 +3443,6 @@ static int do_gc(struct conv_ftl *conv_ftl, bool force, int no_partition)
 	struct ppa ppa;
 	int ch, lun, flashpg;
 
-#ifdef GC_LATENCY
-	struct nvmev_ns *ns = conv_ftl->ns;
-	uint64_t sw_latency, gc_stime, gc_etime, latency;
-	uint64_t latency_sum = 0;
-	gc_stime = __get_ioclock(conv_ftl->ssd);
-#endif
-
 	victim_line = select_victim_line(conv_ftl, force);
 	if (!victim_line) {
 		NVMEV_ASSERT(0);
@@ -3520,28 +3450,35 @@ static int do_gc(struct conv_ftl *conv_ftl, bool force, int no_partition)
 	}
 
 	ppa.g.blk = victim_line->id;
-
-//#ifdef GC_PRINT
-//	static int cnt = 0;
-//	cnt ++;
-//	if (cnt % 5000 == 0) {
-//		printk("GC-ing curline: line:%d,ipc=%d(%d),victim=%d,full=%d,free=%d total_vblks: %u n_gclog: %u slpn: 0x%lx line: 0x%lx", 
-//			ppa.g.blk,\
-//	         victim_line->ipc,victim_line->vpc, conv_ftl->lm.victim_line_cnt, conv_ftl->lm.full_line_cnt, \
-//	          conv_ftl->lm.free_line_cnt, total_valid_blks, 
-//			  conv_ftl->ns->gclm->n_buffered, 
-//			  LPN_FROM_LOCAL_LPN(victim_line->start_local_lpn, conv_ftl->no_part, conv_ftl->ns->nr_parts), 
-//			  victim_line);
-//		//int i__;
-//		//for (i__ = 0; i__ < NO_USER_PARTITION; i__ ++) {
-//		//	printk("GC part: %d partition: %u vzone: %d / %lu gc free zone: %lu", 
-//		//			conv_ftl->no_part, i__, conv_ftl->valid_zone_cnt[i__],
-//		//			conv_ftl->nzones_per_partition, 
-//		//			conv_ftl->gc_free_zone_cnt[i__]);
-//		//}
-//		//printk("%s: total valid zone cnt: %u", __func__, conv_ftl->total_valid_zone_cnt);
-//	}
-//#endif
+		//printk("GC-ing curline: line:%d,ipc=%d(%d),victim=%d,full=%d,free=%d total_vblks: %u", 
+		//	ppa.g.blk,\
+	    //     victim_line->ipc,victim_line->vpc, conv_ftl->lm.victim_line_cnt, conv_ftl->lm.full_line_cnt, \
+	    //      conv_ftl->lm.free_line_cnt, total_valid_blks); 
+		//printk("GC-ing curline: line:%d,ipc=%d(%d),victim=%d,full=%d,free=%d total_vblks: %u slpn: 0x%lx line: 0x%lx", 
+		//	ppa.g.blk,\
+	    //     victim_line->ipc,victim_line->vpc, conv_ftl->lm.victim_line_cnt, conv_ftl->lm.full_line_cnt, \
+	    //      conv_ftl->lm.free_line_cnt, total_valid_blks, 
+		//	  LPN_FROM_LOCAL_LPN(victim_line->start_local_lpn, conv_ftl->no_part, conv_ftl->ns->nr_parts), 
+		//	  victim_line);
+	//static int cnt = 0;
+	//cnt ++;
+	//if (cnt % 5000 == 0) {
+	//	printk("GC-ing curline: line:%d,ipc=%d(%d),victim=%d,full=%d,free=%d total_vblks: %u n_gclog: %u slpn: 0x%lx line: 0x%lx", 
+	//		ppa.g.blk,\
+	//         victim_line->ipc,victim_line->vpc, conv_ftl->lm.victim_line_cnt, conv_ftl->lm.full_line_cnt, \
+	//          conv_ftl->lm.free_line_cnt, total_valid_blks, 
+	//		  conv_ftl->ns->gclm->n_buffered, 
+	//		  LPN_FROM_LOCAL_LPN(victim_line->start_local_lpn, conv_ftl->no_part, conv_ftl->ns->nr_parts), 
+	//		  victim_line);
+	//	int i__;
+	//	for (i__ = 0; i__ < NO_USER_PARTITION; i__ ++) {
+	//		printk("GC part: %d partition: %u vzone: %d / %lu gc free zone: %lu", 
+	//				conv_ftl->no_part, i__, conv_ftl->valid_zone_cnt[i__],
+	//				conv_ftl->nzones_per_partition, 
+	//				conv_ftl->gc_free_zone_cnt[i__]);
+	//	}
+	//	printk("%s: total valid zone cnt: %u", __func__, conv_ftl->total_valid_zone_cnt);
+	//}
 
 	NVMEV_DEBUG("GC-ing line:%d,ipc=%d(%d),victim=%d,full=%d,free=%d\n", ppa.g.blk,\
 	          victim_line->ipc,victim_line->vpc, conv_ftl->lm.victim_line_cnt, conv_ftl->lm.full_line_cnt,\
@@ -3569,14 +3506,6 @@ static int do_gc(struct conv_ftl *conv_ftl, bool force, int no_partition)
 	            ppa.g.lun = lun;
 	            ppa.g.pl = 0;
 	            lunp = get_lun(conv_ftl->ssd, &ppa);
-#ifdef GC_LATENCY
-				if (flashpg == 0) {
-					uint64_t tmp_cmd_stime = __get_ioclock(conv_ftl->ssd);
-					lunp->gc_starttime = (lunp->next_lun_avail_time < tmp_cmd_stime ) ? \
-								 tmp_cmd_stime : \
-								 lunp->next_lun_avail_time;
-				}
-#endif
 #ifndef COUPLED_GC_MTL
 	            clean_one_flashpg(conv_ftl, &ppa);
 #else
@@ -3593,26 +3522,19 @@ static int do_gc(struct conv_ftl *conv_ftl, bool force, int no_partition)
 	                    gce.interleave_pci_dma = false;
 	                    gce.ppa = &ppa;
 #ifdef CHIP_UTIL
-						uint64_t nand_idle_t = 0, nand_active_t = 0;
-	                    ssd_advance_nand(conv_ftl->ssd, &gce, &nand_idle_t, 
-								&nand_active_t);
-						ns->nand_idle_t_sum += nand_idle_t;
-						ns->nand_active_t_sum += nand_active_t;
+					   	ssd_advance_nand(conv_ftl->ssd, &gce, 
+								&(conv_ftl->ns->nand_idle_t_sum), 
+								&(conv_ftl->ns->nand_active_t_sum));
 #else
 	                    ssd_advance_nand(conv_ftl->ssd, &gce);
 #endif
 	                }
 
 	                lunp->gc_endtime = lunp->next_lun_avail_time;
-#ifdef GC_LATENCY
-					NVMEV_ASSERT(lunp->gc_endtime >= lunp->gc_starttime);
-					latency_sum += lunp->gc_endtime - lunp->gc_starttime;
-#endif
 	            }
 	        }
 	    }
 	}
-
 #ifdef COUPLED_GC
 	/* main & gc partition case (NULL start_local_lpn means metadata partition) */
 	if (victim_line->start_local_lpn != INVALID_LPN){
@@ -3665,18 +3587,6 @@ static int do_gc(struct conv_ftl *conv_ftl, bool force, int no_partition)
 			conv_ftl->lm.victim_line_cnt, conv_ftl->lm.full_line_cnt,
 	          conv_ftl->lm.free_line_cnt);
 	*/
-
-#ifdef GC_LATENCY
-	latency = latency_sum / (spp->nchs * spp->luns_per_ch);
-	gc_etime = __get_ioclock(conv_ftl->ssd);
-	NVMEV_ASSERT(gc_etime >= gc_stime);
-	sw_latency = gc_etime - gc_stime;
-	//printk("%s: latency: %llu ns %llu us . SW_lat: %llu ns %llu us. ", 
-	//		__func__, latency, latency, sw_latency, sw_latency);
-	ns->gc_lat_sum += latency;
-	ns->gc_sw_lat_sum += sw_latency;
-	ns->gc_cnt ++;
-#endif
 
 	return 0;
 }
@@ -3739,9 +3649,19 @@ bool conv_read(struct nvmev_ns *ns, struct nvmev_request * req, struct nvmev_res
 
 	static int pcnt = 0;
 
+#ifdef HOST_GC_OVERHEAD_ANALYSIS
+    ns->req_cnt ++;          
+#endif                          
+
 #ifdef WAF	
 	try_print_WAF(ns);
 #endif
+	
+	/*SADDR_ZNS is start of main partitoin. but we subtract START_OFS_IN_MAIN_PART behind so just deduct SADDR_ZNS-START_OFS_IN_MAIN_PART*/
+	if (start_lpn >= SADDR_ZNS) {
+		start_lpn  = start_lpn - (SADDR_ZNS - START_OFS_IN_MAIN_PART) + 0x20000000;
+		end_lpn  = end_lpn - (SADDR_ZNS - START_OFS_IN_MAIN_PART) + 0x20000000;
+	}
 
 #if (defined ZONE_MAPPING || defined MULTI_PARTITION_FTL)
 	int no_partition = NO_LOCAL_PARTITION(start_lpn / nr_parts);
@@ -3772,6 +3692,14 @@ bool conv_read(struct nvmev_ns *ns, struct nvmev_request * req, struct nvmev_res
 
 	NVMEV_ASSERT(conv_ftls);
 	NVMEV_DEBUG("conv_read: start_lpn=%lld, len=%lld, end_lpn=%lld", start_lpn, nr_lba, end_lpn);
+#ifdef JWDBG_CONV_FTL
+//	static int print_ = 0;
+//	int print_interval = 1000;
+//	if (print_ % print_interval == 0){
+//		NVMEV_INFO("conv_read: start_lpn=%lld, len=%lld, end_lpn=%lld", start_lpn, nr_lba, end_lpn);
+//	}
+//	print_ ++;
+#endif
 
 #ifdef CMD_CNT
 	if (start_done) {
@@ -3858,7 +3786,8 @@ bool conv_read(struct nvmev_ns *ns, struct nvmev_request * req, struct nvmev_res
 	            srd.xfer_size = xfer_size;
 	            srd.ppa = &prev_ppa;
 #ifdef CHIP_UTIL
-	            nsecs_completed = ssd_advance_nand(conv_ftl->ssd, &srd, &(ns->nand_idle_t_sum), 
+				nsecs_completed = ssd_advance_nand(conv_ftl->ssd, &srd, 
+						&(ns->nand_idle_t_sum), 
 						&(ns->nand_active_t_sum));
 #else
 	            nsecs_completed = ssd_advance_nand(conv_ftl->ssd, &srd);
@@ -3875,7 +3804,8 @@ bool conv_read(struct nvmev_ns *ns, struct nvmev_request * req, struct nvmev_res
 	        srd.xfer_size = xfer_size;
 	        srd.ppa = &prev_ppa;
 #ifdef CHIP_UTIL
-	        nsecs_completed = ssd_advance_nand(conv_ftl->ssd, &srd, &(ns->nand_idle_t_sum), 
+			nsecs_completed = ssd_advance_nand(conv_ftl->ssd, &srd, 
+						&(ns->nand_idle_t_sum), 
 						&(ns->nand_active_t_sum));
 #else
 	        nsecs_completed = ssd_advance_nand(conv_ftl->ssd, &srd);
@@ -3981,8 +3911,14 @@ bool conv_write(struct nvmev_ns *ns, struct nvmev_request *req, struct nvmev_res
 	    if (last_pg_in_wordline(conv_ftl, &ppa)) {
 	        swr.xfer_size = spp->pgsz * spp->pgs_per_oneshotpg;
 	        swr.ppa = &ppa;
+#ifdef CHIP_UTIL
+			nsecs_completed = ssd_advance_nand(conv_ftl->ssd, &swr, 
+						&(ns->nand_idle_t_sum), 
+						&(ns->nand_active_t_sum));
+#else
 	        nsecs_completed = ssd_advance_nand(conv_ftl->ssd, &swr);
-	        nsecs_latest = (nsecs_completed > nsecs_latest) ? nsecs_completed : nsecs_latest;
+#endif
+			nsecs_latest = (nsecs_completed > nsecs_latest) ? nsecs_completed : nsecs_latest;
 
 	        enqueue_writeback_io_req(req->sq_id, nsecs_completed, wbuf, spp->pgs_per_oneshotpg * spp->pgsz);
 	    }
@@ -4099,10 +4035,14 @@ struct ppa write_zone_mapping_handler(struct conv_ftl *conv_ftl, uint64_t local_
 #ifdef GURANTEE_SEQ_WRITE
 		NVMEV_ASSERT(is_first_lpn_in_zone(conv_ftl, local_lpn));
 #endif
+		//print_dbg_get_zone_maptbl_ent(conv_ftl, local_lpn, __func__);
 #ifndef COUPLED_GC_MTL
 		ppa = get_new_zone(conv_ftl, USER_IO, no_partition);
 #else
 		ppa = get_new_zone(conv_ftl, USER_IO, no_partition, ret);
+#endif
+#ifdef JWDBG_CONV_FTL
+		//printk("[JWDBG] %s: new zone! ppa: %llx %lld\n", __func__, ppa.ppa, ppa.ppa);	
 #endif
 		set_zone_maptbl_ent(conv_ftl, zone_map_ent, &ppa);
 #ifdef COUPLED_GC
@@ -4117,6 +4057,13 @@ struct ppa write_zone_mapping_handler(struct conv_ftl *conv_ftl, uint64_t local_
 		conv_ftl->valid_zone_cnt[no_partition] ++;
 		conv_ftl->total_valid_zone_cnt ++;
 
+		//printk("%s: part: %d start lpn: 0x%lx line: 0x%lx", __func__, 
+		//		conv_ftl->no_part, 
+		//		LPN_FROM_LOCAL_LPN(get_line(conv_ftl, &ppa)->start_local_lpn,
+		//			conv_ftl->no_part, conv_ftl->ns->nr_parts), 
+		//		get_line(conv_ftl, &ppa)
+		//		);
+		//set_rmap_zone_ent(conv_ftl, local_lpn, USER_IO, no_partition);
 	} else {
 		/* To check ppa calculation in zone. */
 		/* TODO: to reduce overhead, use calc_ppa_in_zones in conv_read only. */
@@ -4127,6 +4074,7 @@ struct ppa write_zone_mapping_handler(struct conv_ftl *conv_ftl, uint64_t local_
 		NVMEV_ASSERT(ppa.ppa == _ppa.ppa);
 #else
 #endif
+		//NVMEV_DEBUG("conv_write: got new ppa %lld, ", ppa2pgidx(conv_ftl, &ppa));
 	}
 	return ppa;
 }
@@ -4189,14 +4137,31 @@ bool lm_write(struct nvmev_ns *ns, struct nvmev_request *req, struct nvmev_resul
 	struct ppa ppa, *zone_map_ent, calc_ppa;
 	struct nand_cmd swr;
 	
+#ifdef HOST_GC_OVERHEAD_ANALYSIS
+    ns->req_cnt ++;          
+#endif                          
 #ifdef WAF	
 	try_print_WAF(ns);
 #endif
+	
+	//printk("lm_write: start_lpn=0x%llx, len=%d, end_lpn=0x%llx", start_lpn, nr_lba, end_lpn);
+	uint64_t start_lpn_ = start_lpn;
+	uint64_t end_lpn_ = end_lpn;
 
+	/*SADDR_ZNS is start of main partitoin. but we subtract START_OFS_IN_MAIN_PART behind so just deduct SADDR_ZNS-START_OFS_IN_MAIN_PART*/
+	if (start_lpn == SADDR_ZNS)
+		start_done = true;
+	if (start_lpn >= SADDR_ZNS) {
+		start_lpn  = start_lpn - (SADDR_ZNS - START_OFS_IN_MAIN_PART) + 0x20000000;
+		end_lpn  = end_lpn - (SADDR_ZNS - START_OFS_IN_MAIN_PART) + 0x20000000;
+	}
 	int no_partition = NO_LOCAL_PARTITION(start_lpn / nr_parts);
 	if (no_partition == COLD_DATA_PARTITION || no_partition == COLD_NODE_PARTITION)
 		printk("%s: host write on cold partition!! type: %d lpn: %lld", __func__, no_partition, start_lpn);
 
+	//if (no_partition != NO_LOCAL_PARTITION(end_lpn / nr_parts)) {
+	//	printk("lm_write: start_lpn=0x%llx, len=%d, end_lpn=0x%llx", start_lpn_, nr_lba, end_lpn_);
+	//}
 	NVMEV_ASSERT(no_partition == NO_LOCAL_PARTITION(end_lpn / nr_parts));
 	ret->cid = cmd->common.command_id;
 
@@ -4209,9 +4174,20 @@ bool lm_write(struct nvmev_ns *ns, struct nvmev_request *req, struct nvmev_resul
 	void (*line_handler) (struct conv_ftl *conv_ftl, uint32_t io_type, int no_partition,
 								struct ppa *ppa);
 #endif
-	static int print = 1;
+	//static int print = 1;
 	NVMEV_ASSERT(conv_ftls);
 	NVMEV_DEBUG("conv_write: start_lpn=%lld, len=%d, end_lpn=%lld", start_lpn, nr_lba, end_lpn);
+#ifdef JWDBG_CONV_FTL
+	/*static int print_ = 0;
+	int print_interval = 1000;
+	if (print_ % print_interval == 0){
+		//printk("%s: slpn=%lld, len=%lld, elpn=%lld lpn: 0x%llx ~ 0x%llx", 
+		//	__func__, start_lpn, nr_lba, end_lpn, 
+		//	start_lpn, end_lpn);
+	}
+	print_ ++ ;*/
+#endif
+
 
 	if (IS_META_PARTITION(no_partition)){
 		/* TODO: ftl range check for meta partition */
@@ -4224,24 +4200,27 @@ bool lm_write(struct nvmev_ns *ns, struct nvmev_request *req, struct nvmev_resul
 #ifndef GURANTEE_SEQ_WRITE
 		line_handler  = classify_line;
 #endif
-		if (out_of_partition(conv_ftl, end_lpn/nr_parts)){
-			if (print){
-	    		printk("conv_write: lpn passed FTL range(start_lpn=0x%llx,tt_pgs=%ld)\n", start_lpn, spp->tt_pgs);
-				print = 0;
-			}
-			NVMEV_ASSERT(0);
-	    	//NVMEV_ERROR("conv_write: lpn passed FTL range(start_lpn=0x%llx,tt_pgs=%ld)\n", start_lpn, spp->tt_pgs);
-	    	return false;
-		}
+		//if (out_of_partition(conv_ftl, end_lpn/nr_parts)){
+		//	if (print){
+	    //		printk("conv_write: lpn passed FTL range(start_lpn=0x%llx,tt_pgs=%ld)\n", start_lpn, spp->tt_pgs);
+		//		print = 0;
+		//	}
+		//	NVMEV_ASSERT(0);
+	    //	//NVMEV_ERROR("conv_write: lpn passed FTL range(start_lpn=0x%llx,tt_pgs=%ld)\n", start_lpn, spp->tt_pgs);
+	    //	return false;
+		//}
 	} else {
 		NVMEV_ERROR("%s: partition %d error\n", __func__, no_partition);
+		printk("%s: partition %d error\n", __func__, no_partition);
 		return false;
 	}
 
 	allocated_buf_size = buffer_allocate(wbuf, LBA_TO_BYTE(nr_lba));
 
-	if (allocated_buf_size < LBA_TO_BYTE(nr_lba))
+	if (allocated_buf_size < LBA_TO_BYTE(nr_lba)){
+		//printk("%s: wrong 1!!!!!!!", __func__);
 		return false;
+	}
 
 	nsecs_latest = nsecs_start;
 	nsecs_latest = ssd_advance_write_buffer(
@@ -4257,27 +4236,31 @@ bool lm_write(struct nvmev_ns *ns, struct nvmev_request *req, struct nvmev_resul
 	static uint64_t min_slpn[NO_TYPE] = {0xffffffff, 0xffffffff, \
 		0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff};
 	if (IS_MAIN_PARTITION(no_partition)){
-		start_done = true;
 		start_lpn -= START_OFS_IN_MAIN_PART;
 		end_lpn -= START_OFS_IN_MAIN_PART;
 		if (min_slpn[NO_PARTITION(start_lpn)] > start_lpn){
 			min_slpn[NO_PARTITION(start_lpn)] = start_lpn;
-			//printk("%s: type: %lld start_lpn: 0x%llx", __func__, NO_PARTITION(start_lpn), start_lpn);
+			printk("%s: type: %lld start_lpn: 0x%llx", __func__, NO_PARTITION(start_lpn), start_lpn);
 		}
-		ns->total_write_main_blks_host += (end_lpn - start_lpn + 1);
 	}
 	
 	//printk("lm_write: start_lpn= 0x%lx, end_lpn= 0x%lx", start_lpn, end_lpn);
 	
-#ifdef CMD_CNT
-	if (start_done) {
-		ns->total_write_blks_host += (end_lpn - start_lpn + 1);
-	}
-#endif
-
 #ifdef WAF
 	ns->write_volume_host += (end_lpn - start_lpn + 1);
 	ns->total_write_volume_host += (end_lpn - start_lpn + 1);
+#endif
+
+#ifdef CMD_CNT
+	if (start_done) {
+		if ((end_lpn - start_lpn + 1) < 0) {
+			printk("%s: !!!!!!!!!!!!!!!!!!!!!!: slpn: 0x%llx elpn: 0x%llx s: 0x%llx e: 0x%llx", 
+					__func__, start_lpn, end_lpn, 
+					start_lpn_, end_lpn_);
+
+		}	
+		ns->total_write_blks_host += (end_lpn - start_lpn + 1);
+	}
 #endif
 	/* meta partition. page mapping */
 	for (lpn = start_lpn; lpn <= end_lpn; lpn++) {
@@ -4288,6 +4271,14 @@ bool lm_write(struct nvmev_ns *ns, struct nvmev_request *req, struct nvmev_resul
 #else
 		ppa = write_handler(conv_ftl, local_lpn, no_partition, ret);
 #endif
+#ifdef JWDBG_CONV_FTL
+		//printk("[JWDBG] %s: lpn: 0x%llx local lpn: 0x%llx ppa: 0x%llx %lld\n", 
+		//		__func__, lpn, local_lpn, ppa.ppa, ppa.ppa);
+#endif
+		//if (lpn > 0x20000000) {
+		//	printk("%s: lpn: 0x%lx local_lpn: 0x%lx ftl no: %u ppa: 0x%lx", 
+		//			__func__, lpn, local_lpn, lpn % nr_parts, ppa.ppa);
+		//}
 	    /* update rmap */
 	    set_rmap_ent(conv_ftl, local_lpn, &ppa);
 		
@@ -4305,7 +4296,8 @@ bool lm_write(struct nvmev_ns *ns, struct nvmev_request *req, struct nvmev_resul
 	        swr.xfer_size = spp->pgsz * spp->pgs_per_oneshotpg;
 	        swr.ppa = &ppa;
 #ifdef CHIP_UTIL
-	        nsecs_completed = ssd_advance_nand(conv_ftl->ssd, &swr, &(ns->nand_idle_t_sum), 
+			nsecs_completed = ssd_advance_nand(conv_ftl->ssd, &swr, 
+						&(ns->nand_idle_t_sum), 
 						&(ns->nand_active_t_sum));
 #else
 	        nsecs_completed = ssd_advance_nand(conv_ftl->ssd, &swr);
@@ -4347,6 +4339,10 @@ bool lm_write(struct nvmev_ns *ns, struct nvmev_request *req, struct nvmev_resul
 static inline void discard_zone_mapping_handler(struct conv_ftl *conv_ftl, uint64_t local_lpn,
 													struct ppa *ppa)
 {
+//	static int dcnt = 0;
+//	dcnt ++;
+//	if (dcnt % PCNT == 0)
+//		printk("%s: dcnt: %d", __func__, dcnt);
 	if (invalidate_zone_maptbl_ent(conv_ftl, local_lpn, ppa)){
 #ifdef COUPLED_GC
 		update_window_mgmt_for_discard(conv_ftl, local_lpn);
@@ -4382,6 +4378,9 @@ bool conv_discard(struct nvmev_ns *ns, struct nvmev_request *req, struct nvmev_r
 	struct ppa ppa;
 	//uint64_t nr_lpn_total = 0;
 
+#ifdef HOST_GC_OVERHEAD_ANALYSIS
+    ns->req_cnt ++;          
+#endif                          
 #ifdef WAF	
 	try_print_WAF(ns);
 #endif
@@ -4396,6 +4395,8 @@ bool conv_discard(struct nvmev_ns *ns, struct nvmev_request *req, struct nvmev_r
 	uint64_t total_dblk = 0;
 	
 	ret->cid = cmd->common.command_id;
+	if (!start_done)
+		goto goto_end;
 
 #ifdef CMD_CNT
 	if (start_done) {
@@ -4411,6 +4412,14 @@ bool conv_discard(struct nvmev_ns *ns, struct nvmev_request *req, struct nvmev_r
 		start_lpn = lba / spp->secs_per_pg;
 		end_lpn = (lba + nr_lba - 1) / spp->secs_per_pg;
 		NVMEV_DEBUG("conv_discard: start_lpn=%lld, len=%d, end_lpn=%lld", start_lpn, nr_lba, end_lpn);
+		
+		/*SADDR_ZNS is start of main partitoin. but we subtract START_OFS_IN_MAIN_PART behind so just deduct SADDR_ZNS-START_OFS_IN_MAIN_PART*/
+		if (start_lpn >= SADDR_ZNS) {
+			start_lpn  = start_lpn - (SADDR_ZNS - START_OFS_IN_MAIN_PART) + 0x20000000;
+			end_lpn  = end_lpn - (SADDR_ZNS - START_OFS_IN_MAIN_PART) + 0x20000000;
+		}
+		
+		//printk("conv_discard: start_lpn: 0x%llx, len=%d, end_lpn: 0x%llx", start_lpn, nr_lba, end_lpn);
 #ifdef JWDBG_CONV_FTL
 		//NVMEV_INFO("conv_discard: start_lpn=%lld, len=%lld, end_lpn=%lld nranges: %lld", start_lpn, nr_lba, end_lpn, nranges);
 #endif
@@ -4421,12 +4430,16 @@ bool conv_discard(struct nvmev_ns *ns, struct nvmev_request *req, struct nvmev_r
 		    return false;
 		}
 #endif
+	
 
 #if !(defined ZONE_MAPPING || defined MULTI_PARTITION_FTL)
 		/* TODO: Alignment Check for conventional SSD */
 		/* TODO: Sector level bitmap? */
 #else
 		no_partition = NO_LOCAL_PARTITION(start_lpn / nr_parts);
+		//if (no_partition != NO_LOCAL_PARTITION(end_lpn / nr_parts)) {
+		//	goto goto_end;
+		//}
 		NVMEV_ASSERT(no_partition == NO_LOCAL_PARTITION(end_lpn / nr_parts));
 		
 		if (IS_MAIN_PARTITION(no_partition)){
@@ -4468,17 +4481,36 @@ bool conv_discard(struct nvmev_ns *ns, struct nvmev_request *req, struct nvmev_r
 						lba, nr_lba, lba / spp->secs_per_pg, start_lpn);
 				}
 
+				//int jw_i;
+				//uint64_t jw_lba, jw_nr_lba;
+
+				//for (jw_i = 0; jw_i < nranges; jw_i ++){
+				//	jw_lba = dsm_range[jw_i].slba;
+				//	//nr_lba = dsm_range[i].nlb + 1; /* zero-based */
+				//	jw_nr_lba = dsm_range[jw_i].nlb; /* zero-based */
+				//	printk("%s: %d th: lba: 0x%llx nr_lba: 0x%llx", 
+				//			__func__, jw_i, jw_lba, jw_nr_lba);
+				//}
+
 			}
+			//NVMEV_ASSERT(lba % spp->secs_per_pg == 0);
+			//NVMEV_ASSERT(nr_lba % spp->secs_per_pg == 0);
 		}
 
 #ifdef ZONE_MAPPING
 		if (IS_META_PARTITION(no_partition)){
 			read_handler = read_meta_page_mapping_handler;
-			//NVMEV_ERROR("[JWDBG] %s: discard on meta partition. slpn: 0x%llx elpn; 0x%llx\n", 
-			//				__func__, start_lpn, end_lpn);
+			NVMEV_ERROR("[JWDBG] %s: discard on meta partition. slpn: 0x%llx elpn; 0x%llx\n", 
+							__func__, start_lpn, end_lpn);
 			discard_handler = invalidate_maptbl_ent;
 		} else if (IS_MAIN_PARTITION(no_partition)){
 			read_handler = read_zone_mapping_handler;
+			/* comment here due to the coupled gc. */
+			/*if (out_of_partition(conv_ftl, end_lpn/nr_parts)){
+	    		NVMEV_ERROR("conv_discard: lpn passed FTL range(start_lpn=0x%llx,tt_pgs=%ld)\n", start_lpn, spp->tt_pgs);
+				NVMEV_ASSERT(0);
+				return false;
+			}*/
 			discard_handler = discard_zone_mapping_handler;
 		} else {
 			NVMEV_ERROR("%s: partition %d error\n", __func__, no_partition);
@@ -4488,11 +4520,58 @@ bool conv_discard(struct nvmev_ns *ns, struct nvmev_request *req, struct nvmev_r
 		discard_handler = invalidate_maptbl_ent;
 #endif
 #endif
-#ifdef CMD_CNT
-		if (start_done) {
-			ns->n_discard_blk += end_lpn - start_lpn + 1;
-		}
-#endif
+		//printk("%s: start lpn: 0x%llx end lpn: 0x%llx len: %llu",
+		//		__func__, start_lpn, end_lpn, end_lpn - start_lpn + 1);
+//		static int cnt = 0;
+//		
+//		static uint64_t old_stack[BUF_CNT_], new_stack[BUF_CNT_], cid_stack[BUF_CNT_];
+//		
+//		//if ((start_lpn & 0xe0000000) == 0xe0000000 ) {
+//		if (1) {
+//			old_stack[cnt] = start_lpn;
+//			new_stack[cnt] = end_lpn;
+//			cid_stack[cnt] = ret->cid;
+//			cnt ++;
+//			if (cnt == BUF_CNT_) {
+//#ifdef PLEASE
+//				printk("%s \n \
+//						cid: %u start_lpn: 0x%llx end_lpn: 0x%llx \n \
+//						cid: %u start_lpn: 0x%llx end_lpn: 0x%llx \n \
+//						cid: %u start_lpn: 0x%llx end_lpn: 0x%llx \n \
+//						cid: %u start_lpn: 0x%llx end_lpn: 0x%llx \n \
+//						cid: %u start_lpn: 0x%llx end_lpn: 0x%llx \n \
+//						cid: %u start_lpn: 0x%llx end_lpn: 0x%llx \n \
+//						cid: %u start_lpn: 0x%llx end_lpn: 0x%llx \n \
+//						cid: %u start_lpn: 0x%llx end_lpn: 0x%llx \n \
+//						cid: %u start_lpn: 0x%llx end_lpn: 0x%llx \n \
+//						cid: %u start_lpn: 0x%llx end_lpn: 0x%llx \
+//						", __func__,
+//						cid_stack[0], old_stack[0], new_stack[0],
+//						cid_stack[1], old_stack[1], new_stack[1],
+//						cid_stack[2], old_stack[2], new_stack[2],
+//						cid_stack[3], old_stack[3], new_stack[3],
+//						cid_stack[4], old_stack[4], new_stack[4],
+//						cid_stack[5], old_stack[5], new_stack[5],
+//						cid_stack[6], old_stack[6], new_stack[6],
+//						cid_stack[7], old_stack[7], new_stack[7],
+//						cid_stack[8], old_stack[8], new_stack[8],
+//						cid_stack[9], old_stack[9], new_stack[9]
+//						//old_stack[10], new_stack[10],
+//						//old_stack[11], new_stack[11],
+//						//old_stack[12], new_stack[12],
+//						//old_stack[13], new_stack[13],
+//						//old_stack[14], new_stack[14],
+//						//old_stack[15], new_stack[15],
+//						//old_stack[16], new_stack[16],
+//						//old_stack[17], new_stack[17],
+//						//old_stack[18], new_stack[18],
+//						//old_stack[19], new_stack[19]
+//				);
+//#endif
+//				cnt = 0;
+//			}
+//		}
+		//printk("conv_discard: start_lpn = 0x%lx end_lpn = 0x%lx", start_lpn, end_lpn);
 		for (lpn = start_lpn; lpn <= end_lpn; lpn++) {
 		    conv_ftl = &conv_ftls[lpn % nr_parts];
 		    local_lpn = lpn / nr_parts;
@@ -4510,12 +4589,18 @@ invalidate_page:
 		    if (mapped_ppa(&ppa)) {
 				
 				if ((get_pg(conv_ftl->ssd, &ppa))->status != PG_VALID){
+					printk("HALOOOO 1");
+					printk("[JWDBG] %s: ori lpn: 0x%lx lpn: 0x%lx line: 0x%p ppa: 0x%llx pg status: %d translated: %d", 
+							__func__, ori_lpn, local_lpn*nr_parts, 
+							get_line(conv_ftl, &ppa),
+							ppa.ppa, get_pg(conv_ftl->ssd, &ppa)->status, translated);
 					printk("[JWDBG] %s: ori lpn: 0x%lx lpn: 0x%lx start lpn: 0x%lx ppa: 0x%llx pg status: %d translated: %d line: 0x%lx line wpc: %d", 
 							__func__, ori_lpn, local_lpn*nr_parts, 
 							LPN_FROM_LOCAL_LPN(get_line(conv_ftl, &ppa)->start_local_lpn,
 								conv_ftl->no_part, conv_ftl->ns->nr_parts), 
 							ppa.ppa, get_pg(conv_ftl->ssd, &ppa)->status, translated, 
 							get_line(conv_ftl, &ppa), get_line(conv_ftl, &ppa)->wpc);
+					printk("HALOOOO 2");
 				}
 		        
 				mark_page_invalid(conv_ftl, &ppa);
@@ -4546,19 +4631,41 @@ invalidate_page:
 				struct ppa trans_ppa;
 				struct gc_log gc_log_ret;
 				if (trial_cnt > 0)
-					NVMEV_ASSERT(0);
+					printk("%s: WHAT the SHIVAL? trial_cnt: %d", __func__, trial_cnt);
 				trans_ppa = pop_from_aimless_translator(conv_ftl, local_lpn, &trans_local_lpn, &gc_log_ret);
+				//if (gc_log_ret.old_lpn != 
+				//		LPN_FROM_LOCAL_LPN(local_lpn, conv_ftl->no_part, conv_ftl->ns->nr_parts)) {
+				//	int iiii = 0;
+				//	for (iiii = 0; iiii < cnt; iiii ++) {
+				//		printk("%s: start_lpn: 0x%lx end_lpn: 0x%lx", 
+				//				__func__, old_stack[iiii], new_stack[iiii]);
+				//	}
+				//	for (iiii = 0; iiii < glb_cnt; iiii ++) {
+				//		printk("%s: cid %u comp: old_lpn: 0x%lx new_lpn: 0x%lx", 
+				//				__func__, glb_cid_stack[iiii], glb_old_stack[iiii], glb_new_stack[iiii]);
+				//	}
+				//	printk("%s: lpn: 0x%lx", __func__,  
+				//			LPN_FROM_LOCAL_LPN(local_lpn, conv_ftl->no_part, conv_ftl->ns->nr_parts));
+
+				//}
+				//NVMEV_ASSERT(gc_log_ret.old_lpn == LPN_FROM_LOCAL_LPN(local_lpn, conv_ftl->no_part, conv_ftl->ns->nr_parts));
 				if (mapped_ppa(&trans_ppa)){
 					local_lpn = trans_local_lpn;
 					ppa = trans_ppa;
 
 					/* add translation log for mtl */
 					add_mtl_translation_log(ns, ret, gc_log_ret.old_lpn, gc_log_ret.new_lpn); 
+					//printk("%s: get helped from aimless translator", __func__);
 					trial_cnt ++;
 
 					translated = 1;
 
 					goto invalidate_page;
+					/*NVMEV_ASSERT(mapped_ppa(&ppa));
+		        	mark_page_invalid(conv_ftl, &ppa);
+		        	set_rmap_ent(conv_ftl, INVALID_LPN, &ppa);
+		        	NVMEV_DEBUG("conv_write: %lld is invalid, ", ppa2pgidx(conv_ftl, &ppa));
+    				discard_handler(conv_ftl, local_lpn, &ppa);*/
 				}
 #endif
 				NVMEV_ERROR("conv_discard: discard target lpn 0x%llx must be valid!! slpn: 0x%lx elpn: 0x%lx", lpn, start_lpn, end_lpn);
@@ -4580,6 +4687,9 @@ invalidate_page:
 #endif
 		}
 	}
+	//printk("%s: total_dblk: %llu nranges: %lld avg len: %llu", 
+	//		__func__, total_dblk, nranges, total_dblk / nranges);
+goto_end:
 	kunmap_atomic(vaddr);	
 	ret->status = NVME_SC_SUCCESS;
 
@@ -4622,13 +4732,21 @@ void conv_proc_nvme_rev_io_cmd(struct nvmev_ns * ns, struct nvme_rev_completion 
 	/* remove gc_log */
 	ise = &gclm->ise_array[command_id % NR_INFLIGHT_SET];
 	
+	//if (command_id % 1000 == 0) {
+	//	printk("%s: nxt_cid: %u completed_cid: %u", __func__, gclm->next_command_id, command_id);
+
+	//}
+	//if (ise->command_id != cmd->command_id) 
+	//	printk("%s: ise cid: %u completed cid: %u", __func__, ise->command_id, cmd->command_id);
+
 	gclm->completed_command_id ++;
-#ifdef MG_CMD_CNT
-	ns->total_completed_mg_cmd_cnt ++;
-#endif
 
 	NVMEV_ASSERT(ise->command_id != INVALID_COMMAND_ID);
 	NVMEV_ASSERT(ise->command_id == cmd->command_id);
+	
+	//printk("%s: free! command id: %u idx: %u", __func__, cmd->command_id, 
+	//		cmd->command_id % NR_INFLIGHT_SET);	
+
 	
 	struct list *gc_log_list = &ise->gc_log_list;
 
@@ -4637,12 +4755,63 @@ void conv_proc_nvme_rev_io_cmd(struct nvmev_ns * ns, struct nvme_rev_completion 
 		struct gc_log * gcle = list_entry(le, struct gc_log, list_elem);
 		NVMEV_ASSERT(gcle->status == GC_LOG_INFLIGHT);
 		
+//#ifdef SHIVAL3
+//		
+//		if ((gcle->old_lpn & 0xe0000000) == 0xe0000000 ||
+//			(gcle->new_lpn & 0xe0000000) == 0xe0000000 ) {
+//			glb_cid_stack[glb_cnt] = cmd->command_id;
+//			glb_old_stack[glb_cnt] = gcle->old_lpn;
+//			glb_new_stack[glb_cnt] = gcle->new_lpn;
+//			glb_cnt ++;
+//			if (glb_cnt == BUF_CNT_) {
+//				printk("%s \n \
+//						cid: %u old_lpn: 0x%llx new_lpn: 0x%llx \n \
+//						cid: %u old_lpn: 0x%llx new_lpn: 0x%llx \n \
+//						cid: %u old_lpn: 0x%llx new_lpn: 0x%llx \n \
+//						cid: %u old_lpn: 0x%llx new_lpn: 0x%llx \n \
+//						cid: %u old_lpn: 0x%llx new_lpn: 0x%llx \n \
+//						cid: %u old_lpn: 0x%llx new_lpn: 0x%llx \n \
+//						cid: %u old_lpn: 0x%llx new_lpn: 0x%llx \n \
+//						cid: %u old_lpn: 0x%llx new_lpn: 0x%llx \n \
+//						cid: %u old_lpn: 0x%llx new_lpn: 0x%llx \n \
+//						cid: %u old_lpn: 0x%llx new_lpn: 0x%llx \
+//						", __func__,
+//						glb_cid_stack[0], glb_old_stack[0], glb_new_stack[0],
+//						glb_cid_stack[1], glb_old_stack[1], glb_new_stack[1],
+//						glb_cid_stack[2], glb_old_stack[2], glb_new_stack[2],
+//						glb_cid_stack[3], glb_old_stack[3], glb_new_stack[3],
+//						glb_cid_stack[4], glb_old_stack[4], glb_new_stack[4],
+//						glb_cid_stack[5], glb_old_stack[5], glb_new_stack[5],
+//						glb_cid_stack[6], glb_old_stack[6], glb_new_stack[6],
+//						glb_cid_stack[7], glb_old_stack[7], glb_new_stack[7],
+//						glb_cid_stack[8], glb_old_stack[8], glb_new_stack[8],
+//						glb_cid_stack[9], glb_old_stack[9], glb_new_stack[9]
+//						//old_stack[10], new_stack[10],
+//						//old_stack[11], new_stack[11],
+//						//old_stack[12], new_stack[12],
+//						//old_stack[13], new_stack[13],
+//						//old_stack[14], new_stack[14],
+//						//old_stack[15], new_stack[15],
+//						//old_stack[16], new_stack[16],
+//						//old_stack[17], new_stack[17],
+//						//old_stack[18], new_stack[18],
+//						//old_stack[19], new_stack[19]
+//				);
+//				glb_cnt = 0;
+//			}
+//		}
+//#endif
+		//if ((gcle->old_lpn & 0xe0000000)== 0x60000000 || 
+		//		(gcle->new_lpn & 0xe0000000) == 0x60000000) {
+		//	printk("%s: free gc log: old lpn: 0x%llx new lpn: 0x%llx cid: %u",
+		//		__func__, gcle->old_lpn, gcle->new_lpn, ise->command_id);
+		//}
 		if (IS_GC_PARTITION(NO_PARTITION(gcle->old_lpn))) {
 			struct conv_ftl *conv_ftl = &conv_ftls[gcle->old_lpn % ns->nr_parts];
 			dec_zone_remain_cnt(conv_ftl, LOCAL_LPN_FROM_LPN(gcle->old_lpn, ns->nr_parts));
 		}
 		
-		/* TODO: This is heuristic code. Need to be polished in the future */	
+		/* TODO: This is heuristic code. Need to be polish in the future */	
 		no_ftl = gcle->old_lpn % ns->nr_parts;
 		conv_ftl_tmp = &conv_ftls[no_ftl];
 		cur_secno[no_ftl] = get_zone_idx(conv_ftl_tmp, (gcle->old_lpn / ns->nr_parts));
@@ -4665,10 +4834,13 @@ void conv_proc_nvme_rev_io_cmd(struct nvmev_ns * ns, struct nvme_rev_completion 
 		list_push_back(&gclm->unhandled_gc_log_list, &gcle->list_elem);
 #else
 		free_gc_log(gclm, gcle);
-		gclm->n_log_completed ++;
-		//printk("[JWDBG] %s: freed by mg cmd completion", __func__);
 #endif
 	}
+
+#ifdef SHIVAL
+	//printk("%s: complete rev cmd. cid: %u", __func__, ise->command_id);
+#endif
+	//printk("%s: complete rev cmd. cid: %u", __func__, ise->command_id);
 
 	ise->command_id = INVALID_COMMAND_ID;
 	gclm->n_ise --;

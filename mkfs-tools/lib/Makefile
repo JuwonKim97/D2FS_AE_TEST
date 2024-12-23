@@ -90,10 +90,7 @@ build_triplet = x86_64-pc-linux-gnu
 host_triplet = x86_64-pc-linux-gnu
 subdir = lib
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
-	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
-	$(top_srcdir)/m4/ltversion.m4 $(top_srcdir)/m4/lt~obsolete.m4 \
-	$(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(am__DIST_COMMON)
@@ -207,13 +204,13 @@ CTAGS = ctags
 am__DIST_COMMON = $(srcdir)/Makefile.in \
 	$(top_srcdir)/build-aux/depcomp
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
-ACLOCAL = ${SHELL} /home/juwon/D2FS_artifact/mkfs-tools/build-aux/missing aclocal-1.16
+ACLOCAL = ${SHELL} /home/juwon/d2fs_src/f2fs-tools/build-aux/missing aclocal-1.16
 AMTAR = $${TAR-tar}
 AM_DEFAULT_VERBOSITY = 1
 AR = ar
-AUTOCONF = ${SHELL} /home/juwon/D2FS_artifact/mkfs-tools/build-aux/missing autoconf
-AUTOHEADER = ${SHELL} /home/juwon/D2FS_artifact/mkfs-tools/build-aux/missing autoheader
-AUTOMAKE = ${SHELL} /home/juwon/D2FS_artifact/mkfs-tools/build-aux/missing automake-1.16
+AUTOCONF = ${SHELL} /home/juwon/d2fs_src/f2fs-tools/build-aux/missing autoconf
+AUTOHEADER = ${SHELL} /home/juwon/d2fs_src/f2fs-tools/build-aux/missing autoheader
+AUTOMAKE = ${SHELL} /home/juwon/d2fs_src/f2fs-tools/build-aux/missing automake-1.16
 AWK = mawk
 CC = gcc
 CCDEPMODE = depmode=gcc3
@@ -254,7 +251,7 @@ LIPO =
 LN_S = ln -s
 LTLIBOBJS = 
 LT_SYS_LIBRARY_PATH = 
-MAKEINFO = ${SHELL} /home/juwon/D2FS_artifact/mkfs-tools/build-aux/missing makeinfo
+MAKEINFO = ${SHELL} /home/juwon/d2fs_src/f2fs-tools/build-aux/missing makeinfo
 MANIFEST_TOOL = :
 MKDIR_P = /usr/bin/mkdir -p
 NM = /usr/bin/nm -B
@@ -280,10 +277,10 @@ SET_MAKE =
 SHELL = /bin/bash
 STRIP = strip
 VERSION = 1.9.0
-abs_builddir = /home/juwon/D2FS_artifact/mkfs-tools/lib
-abs_srcdir = /home/juwon/D2FS_artifact/mkfs-tools/lib
-abs_top_builddir = /home/juwon/D2FS_artifact/mkfs-tools
-abs_top_srcdir = /home/juwon/D2FS_artifact/mkfs-tools
+abs_builddir = /home/juwon/d2fs_src/f2fs-tools/lib
+abs_srcdir = /home/juwon/d2fs_src/f2fs-tools/lib
+abs_top_builddir = /home/juwon/d2fs_src/f2fs-tools
+abs_top_srcdir = /home/juwon/d2fs_src/f2fs-tools
 ac_ct_AR = ar
 ac_ct_CC = gcc
 ac_ct_DUMPBIN = 
@@ -312,9 +309,9 @@ host_vendor = pc
 htmldir = ${docdir}
 includedir = ${prefix}/include
 infodir = ${datarootdir}/info
-install_sh = ${SHELL} /home/juwon/D2FS_artifact/mkfs-tools/build-aux/install-sh
-libblkid_CFLAGS = -I/usr/include/uuid -I/usr/include/blkid
-libblkid_LIBS = -lblkid
+install_sh = ${SHELL} /home/juwon/d2fs_src/f2fs-tools/build-aux/install-sh
+libblkid_CFLAGS = 
+libblkid_LIBS = 
 libdir = ${exec_prefix}/lib
 libexecdir = ${exec_prefix}/libexec
 libselinux_CFLAGS = 

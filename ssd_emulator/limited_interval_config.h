@@ -13,18 +13,19 @@
  *
  **********************************************************************/
 #define PCNT 10000
-#define MULTI_PARTITION_MTL
+//#define MULTI_PARTITION_MTL
 #define MULTI_PARTITION_FTL
 #define JWDBG_CONV_FTL
 #undef JWDBG_IO
 #undef GURANTEE_SEQ_WRITE
 #define DISCARD_ENABLED
+#undef GC_TEST
 
-#define GC_LATENCY
+#define CMD_CNT
 
 #define EQUAL_IM_MEM
-#define CHIP_UTIL
-#undef ZERO_OP_AREA
+
+#define ZERO_OP_AREA
 
 /* multi partition */
 #ifdef MULTI_PARTITION_FTL  
@@ -34,20 +35,22 @@
 #ifdef ZONE_MAPPING
 
 /* coupled gc */
-#define COUPLED_GC
-#define COUPLED_GC_MTL
+//#define COUPLED_GC
+//#define COUPLED_GC_MTL
 
 #define WAF
-#define MG_CMD_CNT
-#define CMD_CNT
-#define GC_LOG_MEM
+#define CHIP_UTIL
+#undef HOST_GC_OVERHEAD_ANALYSIS 
+#undef MG_CMD_CNT
+#undef GC_LOG_MEM
 
-#define PRINT_PART_UTIL
+#undef GC_LOG_MERGE
+#undef SEPARATE_GC_LOG
+#undef SHIVAL
+#define SHIVAL2
+#define SHIVAL3
 
-#define GC_LOG_MERGE
-#define SEPARATE_GC_LOG
-
-#define TWO_GC_PARTITION
+//#define TWO_GC_PARTITION
 
 #define DEACTIVATE_SLIDING_WINDOW
 
@@ -58,15 +61,14 @@
 #define NR_MAX_TRANSLATION_LOG 256
 #endif
 
-#undef COUPLED_GC_DEBUG
+//#define COUPLED_GC_DEBUG
 #undef COUPLED_GC_PRINT
 #undef GC_LOG_PRINT
 #undef GC_LOG_PRINT2
-#undef LINE_PRINT
-#undef GC_PRINT
+#define LINE_PRINT
 
 /* migration io */
-#define MIGRATION_IO
+//#define MIGRATION_IO
 
 #undef MG_HANDLER_DISABLED
 

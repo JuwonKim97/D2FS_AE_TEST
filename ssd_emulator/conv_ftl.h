@@ -99,7 +99,7 @@ struct write_flow_control {
     uint32_t credits_to_refill;
 };
 
-#ifdef COUPLED_GC
+//#ifdef COUPLED_GC
 struct window_mgmt {
     /* only for  partitions. for coupled gc and nameless write */
     uint64_t next_local_lpn; /* next local lpn to allocate */
@@ -112,7 +112,7 @@ struct window_mgmt {
 	uint64_t free_zone;
 	uint16_t * remain_cnt_array;
 };
-#endif
+//#endif
 
 struct conv_ftl {
     struct ssd *ssd;
@@ -126,11 +126,11 @@ struct conv_ftl {
 #endif
 	unsigned long nzones_per_partition;	/* # of logical zones in each partition */
     unsigned long nzones_per_gc_partition;	/* # of logical zones in each partition */
-#ifdef COUPLED_GC
+//#ifdef COUPLED_GC
 	unsigned int no_part;				/* ftl number to recover lpn from local lpn */
 	struct nvmev_ns *ns;
 	struct window_mgmt wm[NO_USER_PARTITION];
-#endif
+//#endif
 #endif
 
 #ifdef MULTI_PARTITION_FTL
