@@ -37,11 +37,6 @@
 #define INVALID_LPN     (~(0ULL))
 #define UNMAPPED_PPA    (~(0ULL))
 
-#ifdef ZONE_MAPPING
-#define INVALID_ZONENO    (~(0ULL))
-#define UNMAPPED_ZONENO    (~(0ULL))
-#endif
-
 enum {
     NAND_READ =  0,
     NAND_WRITE = 1,
@@ -99,9 +94,6 @@ struct ppa {
         } h;
 
         uint64_t ppa;
-#ifdef ZONE_MAPPING
-        uint64_t zone_start_ppa;
-#endif
     };
 };
 

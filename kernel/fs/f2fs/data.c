@@ -2546,67 +2546,50 @@ static inline bool check_inplace_update_policy(struct inode *inode,
 	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
 	unsigned int policy = SM_I(sbi)->ipu_policy;
 
-	if (policy & (0x1 << F2FS_IPU_FORCE)){
-		panic("%s: 1st true, not expected\n", __func__);
+	if (policy & (0x1 << F2FS_IPU_FORCE))
 		return true;
-	}
-	if (policy & (0x1 << F2FS_IPU_SSR) && f2fs_need_SSR(sbi)){
-		panic("%s: 2nd true, not expected\n", __func__);
+	if (policy & (0x1 << F2FS_IPU_SSR) && f2fs_need_SSR(sbi))
 		return true;
-	}
 	if (policy & (0x1 << F2FS_IPU_UTIL) &&
-			utilization(sbi) > SM_I(sbi)->min_ipu_util){
-		panic("%s: 3rd true, not expected\n", __func__);
+			utilization(sbi) > SM_I(sbi)->min_ipu_util)
 		return true;
-	}
 	if (policy & (0x1 << F2FS_IPU_SSR_UTIL) && f2fs_need_SSR(sbi) &&
-			utilization(sbi) > SM_I(sbi)->min_ipu_util){
-		panic("%s: 4th true, not expected\n", __func__);
+			utilization(sbi) > SM_I(sbi)->min_ipu_util)
 		return true;
-	}
+
 	/*
 	 * IPU for rewrite async pages
 	 */
 	if (policy & (0x1 << F2FS_IPU_ASYNC) &&
 			fio && fio->op == REQ_OP_WRITE &&
 			!(fio->op_flags & REQ_SYNC) &&
-			!IS_ENCRYPTED(inode)){
-		panic("%s: async true, not expected\n", __func__);
+			!IS_ENCRYPTED(inode))
 		return true;
-	}
+
 	/* this is only set during fdatasync */
 	if (policy & (0x1 << F2FS_IPU_FSYNC) &&
-			is_inode_flag_set(inode, FI_NEED_IPU)){
-		panic("%s: fdatasync true, not expected\n", __func__);
+			is_inode_flag_set(inode, FI_NEED_IPU))
 		return true;
-	}
 
 	if (unlikely(fio && is_sbi_flag_set(sbi, SBI_CP_DISABLED) &&
-			!f2fs_is_checkpointed_data(sbi, fio->old_blkaddr))){
-		panic("%s: cp related true, not expected\n", __func__);
+			!f2fs_is_checkpointed_data(sbi, fio->old_blkaddr)))
 		return true;
-	}
 
 	return false;
 }
 
 bool f2fs_should_update_inplace(struct inode *inode, struct f2fs_io_info *fio)
 {
-	if (f2fs_is_pinned_file(inode)){
-		panic("f2fs_should_update_inplace: f2fs_is_pinned_file true, not expected");
+	if (f2fs_is_pinned_file(inode))
 		return true;
-	}
+
 	/* if this is cold file, we should overwrite to avoid fragmentation */
-	if (file_is_cold(inode)){
-		panic("f2fs_should_update_inplace: f2fs_is_cold true, not expected");
+	if (file_is_cold(inode))
 		return true;
-	}
-	if (check_inplace_update_policy(inode, fio)){
-		//panic("f2fs_should_update_inplace: check_inplace_update_policy true, not expected");
-		return true;
-	}
-	return false;
+
+	return check_inplace_update_policy(inode, fio);
 }
+
 bool f2fs_should_update_outplace(struct inode *inode, struct f2fs_io_info *fio)
 {
 	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
@@ -2634,6 +2617,7 @@ bool f2fs_should_update_outplace(struct inode *inode, struct f2fs_io_info *fio)
 static inline bool need_inplace_update(struct f2fs_io_info *fio)
 {
 	struct inode *inode = fio->page->mapping->host;
+
 	if (f2fs_should_update_outplace(inode, fio))
 		return false;
 
@@ -2846,17 +2830,10 @@ write:
 
 		goto done;
 	}
-	/*if (!wbc->for_reclaim)
-		need_balance_fs = true;
-	else if (has_not_enough_free_secs(sbi, 0, 0))
-		goto redirty_out;
-	else
-		set_inode_flag(inode, FI_HOT_DATA);
-	*/
 
 	if (!wbc->for_reclaim)
 		need_balance_fs = true;
-	else if (has_not_enough_free_physical_secs(sbi, 0, 0))
+	else if (has_not_enough_free_secs(sbi, 0, 0))
 		goto redirty_out;
 	else
 		set_inode_flag(inode, FI_HOT_DATA);

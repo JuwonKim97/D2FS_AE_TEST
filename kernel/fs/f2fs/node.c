@@ -714,7 +714,6 @@ got:
 	return level;
 }
 
-
 /*
  * Caller should call f2fs_put_dnode(dn).
  * Also, it should grab and release a rwsem by calling f2fs_lock_op() and
@@ -756,7 +755,7 @@ int f2fs_get_dnode_of_data(struct dnode_of_data *dn, pgoff_t index, int mode)
 		nids[1] = get_nid(parent, offset[0], true);
 	dn->inode_page = npage[0];
 	dn->inode_page_locked = true;
-	
+
 	/* get indirect or direct nodes */
 	for (i = 1; i <= level; i++) {
 		bool done = false;
@@ -1390,7 +1389,6 @@ page_hit:
 			  nid, nid_of_node(page), ino_of_node(page),
 			  ofs_of_node(page), cpver_of_node(page),
 			  next_blkaddr_of_node(page));
-		//panic("%s: inconsistent node block panic\n", __func__);
 		err = -EINVAL;
 out_err:
 		ClearPageUptodate(page);
@@ -1675,7 +1673,6 @@ int f2fs_fsync_node_pages(struct f2fs_sb_info *sbi, struct inode *inode,
 	nid_t ino = inode->i_ino;
 	int nr_pages;
 	int nwritten = 0;
-	//nid_t nid;
 
 	if (atomic) {
 		last_page = last_fsync_dnode(sbi, ino);
@@ -1743,11 +1740,6 @@ continue_unlock:
 			if (!clear_page_dirty_for_io(page))
 				goto continue_unlock;
 
-			
-			/*nid = nid_of_node(page);
-			if (nid == 7)
-				printk("[JW DBG] %s: nid 7 bef __write_node_page\n", __func__);
-			*/
 			ret = __write_node_page(page, atomic &&
 						page == last_page,
 						&submitted, wbc, true,
@@ -1875,7 +1867,7 @@ continue_unlock:
 
 int f2fs_sync_node_pages(struct f2fs_sb_info *sbi,
 				struct writeback_control *wbc,
-				bool do_balance, enum iostat_type io_type)//, int* nid7_synced)
+				bool do_balance, enum iostat_type io_type)
 {
 	pgoff_t index;
 	struct pagevec pvec;
@@ -1883,7 +1875,7 @@ int f2fs_sync_node_pages(struct f2fs_sb_info *sbi,
 	int nwritten = 0;
 	int ret = 0;
 	int nr_pages, done = 0;
-	//nid_t nid;
+
 	pagevec_init(&pvec);
 
 next_step:
@@ -1963,12 +1955,6 @@ write_node:
 			set_fsync_mark(page, 0);
 			set_dentry_mark(page, 0);
 
-			/*nid = nid_of_node(page);
-			if (nid == 7){
-				printk("[JW DBG] %s: nid 7 bef __write_node_page\n", __func__);
-				*nid7_synced = 1;
-			}
-			*/
 			ret = __write_node_page(page, false, &submitted,
 						wbc, do_balance, io_type, NULL);
 			if (ret)
@@ -2053,7 +2039,7 @@ static int f2fs_write_node_pages(struct address_space *mapping,
 	struct f2fs_sb_info *sbi = F2FS_M_SB(mapping);
 	struct blk_plug plug;
 	long diff;
-	//int tmpint = 0;
+
 	if (unlikely(is_sbi_flag_set(sbi, SBI_POR_DOING)))
 		goto skip_write;
 
@@ -2075,8 +2061,7 @@ static int f2fs_write_node_pages(struct address_space *mapping,
 
 	diff = nr_pages_to_write(sbi, NODE, wbc);
 	blk_start_plug(&plug);
-	//printk("[JW DBG] %s: AM I?\n", __func__);
-	f2fs_sync_node_pages(sbi, wbc, true, FS_NODE_IO);//, &tmpint);
+	f2fs_sync_node_pages(sbi, wbc, true, FS_NODE_IO);
 	blk_finish_plug(&plug);
 	wbc->nr_to_write = max((long)0, wbc->nr_to_write - diff);
 

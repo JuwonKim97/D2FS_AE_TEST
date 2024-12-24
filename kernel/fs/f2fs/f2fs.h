@@ -38,6 +38,10 @@
 	} while (0)
 #endif
 
+#define AGGRESSIVE_DISCARD
+#define WAF
+
+
 enum {
 	FAULT_KMALLOC,
 	FAULT_KVMALLOC,
@@ -199,10 +203,14 @@ enum {
 #define CP_RESIZE 	0x00000080
 
 #define MAX_DISCARD_BLOCKS(sbi)		BLKS_PER_SEC(sbi)
+
+#ifdef AGGRESSIVE_DISCARD
 #define DEF_MAX_DISCARD_REQUEST		80000	
-//#define DEF_MAX_DISCARD_REQUEST		8	/* issue 8 discards per round */
+#else
+#define DEF_MAX_DISCARD_REQUEST		8	/* issue 8 discards per round */
+#endif
+
 #define DEF_MIN_DISCARD_ISSUE_TIME	50	/* 50 ms, if exists */
-//#define DEF_MIN_DISCARD_ISSUE_TIME	50	/* 50 ms, if exists */
 #define DEF_MID_DISCARD_ISSUE_TIME	500	/* 500 ms, if device busy */
 #define DEF_MAX_DISCARD_ISSUE_TIME	60000	/* 60 s, if no candidates */
 #define DEF_DISCARD_URGENT_UTIL		80	/* do more discard over 80% */
@@ -217,7 +225,6 @@ struct cp_control {
 	__u64 trim_start;
 	__u64 trim_end;
 	__u64 trim_minlen;
-	bool excess_prefree;
 };
 
 /*
@@ -269,13 +276,11 @@ struct fsync_node_entry {
 	unsigned int seq_id;	/* sequence id */
 };
 
-
 /* for the bitmap indicate blocks to be discarded */
 struct discard_entry {
 	struct list_head list;	/* list head */
 	block_t start_blkaddr;	/* start blockaddr of current segment */
 	unsigned char discard_map[SIT_VBLOCK_MAP_SIZE];	/* segment discard bitmap */
-	struct list_head ddm_list;
 };
 
 /* default discard granularity of inner discard thread, unit: block count */
@@ -573,80 +578,6 @@ struct extent_tree {
 	atomic_t node_cnt;		/* # of extent node in rb-tree*/
 	bool largest_updated;		/* largest extent updated */
 };
-
-
-
-/*dynamic_discard_map*/
-struct dynamic_discard_map {
-
-	/*hash*/
-	struct hlist_node hnode;
-	unsigned long long key;
-
-	/* key in rb_entry is segno*/	
-	struct rb_entry rbe;
-	unsigned char *dc_map;
-
-	struct list_head dirty_list; 	/* dirty list*/
-	atomic_t is_dirty;		/* DDM is dirty?*/
-
-	struct list_head history_list; /*existing all ddm list*/
-	struct list_head drange_journal_list; 	/* holding this ddm's discard range journal*/
-	struct list_head dmap_journal_list;	/* holding this ddm's discard bitmap journal */
-};
-
-
-struct discard_range{
-	unsigned int start_blkaddr;
-	unsigned int len;
-};
-
-struct discard_range_entry {
-	struct discard_range discard_range_array[DISCARD_RANGE_MAX_NUM];
-	struct list_head list; 			/* discard range entry list */
-	unsigned int cnt; 			/* valid number of discard range */
-#ifndef LM
-	struct list_head ddm_list; 			
-#endif
-};
-
-#define dynamic_discard_map(ptr, type, member) container_of(ptr, type, member)
-
-struct dynamic_discard_map_control {
-	/*hash table version*/
-	struct hlist_head *ht;
-	unsigned int hbits;
-	//struct mutex *per_entry_lck_list;
-	
-	unsigned int long_threshold;		/* determine to issue discard directly or not*/
-	/*rb tree version*/
-	struct rb_root_cached root;		/* root of discard map rb-tree */
-	struct mutex ddm_lock;
-	
-	atomic_t node_cnt;			/* dynamic discard map node count */
-	atomic_t cur_inv_blk_cnt;
-	atomic_t dj_seg_cnt;			/* number of segments for discard journal bitmap */
-	atomic_t dj_range_cnt;			/* number of discard journal range */
-	atomic_t history_seg_cnt;
-	unsigned int segs_per_node;		/*number of segments each node manages*/
-	//unsigned int count;
-	struct list_head dirty_head;			/* To save updated ddm. */
-	struct list_head history_head;		/* contain every ddm entry */
-	
-	/* discard range enttry */
-	atomic_t drange_entry_cnt;
-	struct list_head discard_range_head;		/* long discard journal list */
-	struct list_head discard_map_head;		/* small discard journal list */
-	struct list_head issued_discard_head;		/* issued discard cmd list */
-	/* struct rw_semaphore ddm_sema;	to protect SIT cache */
-	atomic_t total_inv_blk_cnt;
-	atomic_t total_val_blk_cnt;
-};
-
-
-
-
-
 
 /*
  * This structure is taken from ext4_map_blocks.
@@ -1032,11 +963,9 @@ struct f2fs_sm_info {
 
 	struct rw_semaphore curseg_lock;	/* for preventing curseg change */
 
-	struct rw_semaphore curseg_zone_lock;
 	block_t seg0_blkaddr;		/* block address of 0'th segment */
 	block_t main_blkaddr;		/* start block address of main area */
 	block_t ssa_blkaddr;		/* start block address of SSA area */
-	block_t start_segno;		/*IFLBA: moved from free_i to here*/
 
 	unsigned int segment_count;	/* total # of segments */
 	unsigned int main_segments;	/* # of segments in main area */
@@ -1063,9 +992,6 @@ struct f2fs_sm_info {
 
 	/* for discard command control */
 	struct discard_cmd_control *dcc_info;
-
-	/*for dynamic discard map control*/
-	struct dynamic_discard_map_control *ddmc_info;
 };
 
 /*
@@ -1655,6 +1581,14 @@ struct f2fs_sb_info {
 #ifdef CONFIG_F2FS_FS_COMPRESSION
 	struct kmem_cache *page_array_slab;	/* page array entry */
 	unsigned int page_array_slab_size;	/* default page array slab size */
+#endif
+
+#ifdef WAF
+	unsigned int gc_written_blk;
+	unsigned int total_gc_written_blk;
+	atomic_t	host_written_blk;
+	atomic_t	total_host_written_blk;
+	unsigned long long last_t;
 #endif
 };
 
@@ -2935,8 +2869,6 @@ static inline int f2fs_is_mmap_file(struct inode *inode)
 
 static inline bool f2fs_is_pinned_file(struct inode *inode)
 {
-	if (is_inode_flag_set(inode, FI_PIN_FILE))
-		panic("f2fs_is_pinned_file: this is pinned file. not expected");
 	return is_inode_flag_set(inode, FI_PIN_FILE);
 }
 
@@ -3320,8 +3252,7 @@ int f2fs_enable_quota_files(struct f2fs_sb_info *sbi, bool rdonly);
 int f2fs_quota_sync(struct super_block *sb, int type);
 void f2fs_quota_off_umount(struct super_block *sb);
 int f2fs_commit_super(struct f2fs_sb_info *sbi, bool recover);
-int f2fs_sync_fs_op(struct super_block *sb, int sync);
-int f2fs_sync_fs(struct super_block *sb, int sync, bool excess_prefree);
+int f2fs_sync_fs(struct super_block *sb, int sync);
 int f2fs_sanity_check_ckpt(struct f2fs_sb_info *sbi);
 
 /*
@@ -3365,7 +3296,7 @@ int f2fs_fsync_node_pages(struct f2fs_sb_info *sbi, struct inode *inode,
 			unsigned int *seq_id);
 int f2fs_sync_node_pages(struct f2fs_sb_info *sbi,
 			struct writeback_control *wbc,
-			bool do_balance, enum iostat_type io_type);//, int* tmp);
+			bool do_balance, enum iostat_type io_type);
 int f2fs_build_free_nids(struct f2fs_sb_info *sbi, bool sync, bool mount);
 bool f2fs_alloc_nid(struct f2fs_sb_info *sbi, nid_t *nid);
 void f2fs_alloc_nid_done(struct f2fs_sb_info *sbi, nid_t nid);
@@ -3404,7 +3335,6 @@ void f2fs_stop_discard_thread(struct f2fs_sb_info *sbi);
 bool f2fs_issue_discard_timeout(struct f2fs_sb_info *sbi);
 void f2fs_clear_prefree_segments(struct f2fs_sb_info *sbi,
 					struct cp_control *cpc);
-
 void f2fs_dirty_to_prefree(struct f2fs_sb_info *sbi);
 block_t f2fs_get_unusable_blocks(struct f2fs_sb_info *sbi);
 int f2fs_disable_cp_again(struct f2fs_sb_info *sbi, block_t unusable);
@@ -3467,12 +3397,6 @@ unsigned int f2fs_usable_segs_in_sec(struct f2fs_sb_info *sbi,
 unsigned int f2fs_usable_blks_in_seg(struct f2fs_sb_info *sbi,
 			unsigned int segno);
 
-void issue_and_clean_all_ddm(struct f2fs_sb_info *sbi);
-void flush_dynamic_discard_maps(struct f2fs_sb_info *sbi, 
-			struct cp_control *cpc);
-
-block_t f2fs_write_discard_journals(struct f2fs_sb_info *sbi,
-	       		block_t start_blk, block_t journal_limit_addr);
 /*
  * checkpoint.c
  */
@@ -3502,7 +3426,6 @@ void f2fs_release_orphan_inode(struct f2fs_sb_info *sbi);
 void f2fs_add_orphan_inode(struct inode *inode);
 void f2fs_remove_orphan_inode(struct f2fs_sb_info *sbi, nid_t ino);
 int f2fs_recover_orphan_inodes(struct f2fs_sb_info *sbi);
-int f2fs_recover_discard_journals(struct f2fs_sb_info *sbi);
 int f2fs_get_valid_checkpoint(struct f2fs_sb_info *sbi);
 void f2fs_update_dirty_page(struct inode *inode, struct page *page);
 void f2fs_remove_dirty_inode(struct inode *inode);
@@ -3890,14 +3813,6 @@ void f2fs_leave_shrinker(struct f2fs_sb_info *sbi);
  */
 struct rb_entry *f2fs_lookup_rb_tree(struct rb_root_cached *root,
 				struct rb_entry *cached_re, unsigned int ofs);
-
-
-struct rb_node **f2fs_lookup_pos_rb_tree_ext(struct f2fs_sb_info *sbi,
-					struct rb_root_cached *root,
-					struct rb_node **parent,
-					unsigned long long key, bool *leftmost, int *height,
-					bool *exist);
-
 struct rb_node **f2fs_lookup_rb_tree_ext(struct f2fs_sb_info *sbi,
 				struct rb_root_cached *root,
 				struct rb_node **parent,

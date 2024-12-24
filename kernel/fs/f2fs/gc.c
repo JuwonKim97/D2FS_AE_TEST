@@ -50,6 +50,7 @@ static int gc_thread_func(void *data)
 
 		if (try_to_freeze()) {
 			stat_other_skip_bggc_count(sbi);
+			printk("blocked by cond 1");
 			continue;
 		}
 		if (kthread_should_stop())
@@ -58,6 +59,7 @@ static int gc_thread_func(void *data)
 		if (sbi->sb->s_writers.frozen >= SB_FREEZE_WRITE) {
 			increase_sleep_time(gc_th, &wait_ms);
 			stat_other_skip_bggc_count(sbi);
+			printk("blocked by cond 2");
 			continue;
 		}
 
@@ -68,6 +70,7 @@ static int gc_thread_func(void *data)
 
 		if (!sb_start_write_trylock(sbi->sb)) {
 			stat_other_skip_bggc_count(sbi);
+			printk("blocked by cond 3");
 			continue;
 		}
 
@@ -106,15 +109,18 @@ static int gc_thread_func(void *data)
 			decrease_sleep_time(gc_th, &wait_ms);
 		else
 			increase_sleep_time(gc_th, &wait_ms);
+		
 do_gc:
 		stat_inc_bggc_count(sbi->stat_info);
 
 		sync_mode = F2FS_OPTION(sbi).bggc_mode == BGGC_MODE_SYNC;
 
 		/* if return value is not zero, no victim was selected */
-		//if (f2fs_gc(sbi, sync_mode, true, NULL_SEGNO))
-		//	wait_ms = gc_th->no_gc_sleep_time;
-		up_write(&sbi->gc_lock);
+		//printk("[JWDBG] try bggc");
+		//wait_ms = DEF_GC_THREAD_URGENT_SLEEP_TIME; //3000;
+		if (f2fs_gc(sbi, sync_mode, true, NULL_SEGNO)){
+			wait_ms = gc_th->no_gc_sleep_time;
+		}
 
 		trace_f2fs_background_gc(sbi->sb, wait_ms,
 				prefree_segments(sbi), free_segments(sbi));
@@ -1632,6 +1638,10 @@ skip:
 	blk_finish_plug(&plug);
 
 	stat_inc_call_count(sbi->stat_info);
+#ifdef WAF
+	sbi->gc_written_blk += submitted;
+	sbi->total_gc_written_blk += submitted;
+#endif
 
 	return seg_freed;
 }
@@ -1639,7 +1649,6 @@ skip:
 int f2fs_gc(struct f2fs_sb_info *sbi, bool sync,
 			bool background, unsigned int segno)
 {
-
 	int gc_type = sync ? FG_GC : BG_GC;
 	int sec_freed = 0, seg_freed = 0, total_freed = 0;
 	int ret = 0;
@@ -1652,7 +1661,8 @@ int f2fs_gc(struct f2fs_sb_info *sbi, bool sync,
 	unsigned long long last_skipped = sbi->skipped_atomic_files[FG_GC];
 	unsigned long long first_skipped;
 	unsigned int skipped_round = 0, round = 0;
-	//panic("[JW DBG] %s: this should not be called\n ", __func__ );
+	static bool is_first_gc = true;
+
 	trace_f2fs_gc_begin(sbi->sb, sync, background,
 				get_pages(sbi, F2FS_DIRTY_NODES),
 				get_pages(sbi, F2FS_DIRTY_DENTS),
@@ -1699,7 +1709,10 @@ gc_more:
 	ret = __get_victim(sbi, &segno, gc_type);
 	if (ret)
 		goto stop;
-
+	if (is_first_gc && gc_type == FG_GC){
+		printk("[JWDBG] %s: do %s!!", __func__, gc_type == FG_GC? "FG_GC" : "BG_GC");
+		is_first_gc = false;
+	}
 	seg_freed = do_garbage_collect(sbi, segno, &gc_list, gc_type);
 	if (gc_type == FG_GC &&
 		seg_freed == f2fs_usable_segs_in_sec(sbi, segno))
@@ -1781,8 +1794,6 @@ static void init_atgc_management(struct f2fs_sb_info *sbi)
 		SIT_I(sbi)->elapsed_time >= DEF_GC_THREAD_AGE_THRESHOLD)
 		am->atgc_enabled = true;
 
-	am->atgc_enabled = false;//for IFLBA
-
 	am->root = RB_ROOT_CACHED;
 	INIT_LIST_HEAD(&am->victim_list);
 	am->victim_count = 0;
@@ -1803,7 +1814,7 @@ void f2fs_build_gc_manager(struct f2fs_sb_info *sbi)
 		SIT_I(sbi)->last_victim[ALLOC_NEXT] =
 				GET_SEGNO(sbi, FDEV(0).end_blk) + 1;
 
-	//init_atgc_management(sbi);
+	init_atgc_management(sbi);
 }
 
 static int free_segment_range(struct f2fs_sb_info *sbi,
