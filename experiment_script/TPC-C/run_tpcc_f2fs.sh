@@ -7,7 +7,7 @@ MNT=/mnt
 DATA=/exp_mysql_data
 DEV_whole=/dev/nvme3n1
 CUR_DIR=$(pwd)
-FILESYSTEM=(vanilla_dsm_waf)
+FILESYSTEM=(f2fs)
 OUTPUTDIR="f2fs_data/tpcc_F2FS_exp_output_${FILESYSTEM}_`date "+%Y%m%d"`_`date "+%H%M"`"
 
 main()

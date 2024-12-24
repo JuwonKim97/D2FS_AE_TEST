@@ -20,7 +20,7 @@ main()
 	echo -e "n\n\n\n\n\nw" | fdisk ${DEV_whole}
 	
 	# Create result root directory
-	mkdir ${OUTPUTDIR}
+	mkdir -p ${OUTPUTDIR}
 
 	# Disable ASLR
 	echo 0 > /proc/sys/kernel/randomize_va_space
@@ -116,7 +116,7 @@ main()
 
 		           cat ${OUTPUTDIR_FS_JOB}/dmesg |  sed 's/\]//g' | sed 's/\[//g' | awk -v num="$number" '{$1 = $1 - num; print $0}' > ${OUTPUTDIR_FS_JOB}/dmesg_parsed
 
-		               
+		
 		           cat ${OUTPUTDIR_FS_JOB}/dmesg_parsed | grep MG_CMD_CNT > ${OUTPUTDIR_FS_JOB}/mgcmd_only
 			   echo "# timestamp	command count (MB)\n" > ${OUTPUTDIR_FS_JOB}/migration_command_count
 		           cat ${OUTPUTDIR_FS_JOB}/mgcmd_only | awk '{print $1, $6}'  >> ${OUTPUTDIR_FS_JOB}/migration_command_count

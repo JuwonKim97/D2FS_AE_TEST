@@ -7,7 +7,7 @@ MNT=/mnt
 DATA=/exp_mysql_data
 DEV_whole=/dev/nvme3n1
 CUR_DIR=$(pwd)
-FILESYSTEM=(zns_print_gc_hack_hack)
+FILESYSTEM=(zns)
 OUTPUTDIR="zns_data/tpcc_ZNS_exp_output_${FILESYSTEM}_`date "+%Y%m%d"`_`date "+%H%M"`"
 
 main()
@@ -66,6 +66,13 @@ main()
 	dmesg > ${OUTPUTDIR}/dmesg
 	number=$(cat ${OUTPUTDIR}/dmesg | grep STARTT | sed 's/\]//g' |  awk '{print $2}') 
 	cat ${OUTPUTDIR}/dmesg | sed 's/\]//g' | sed 's/\[//g' | awk -v num="$number" '{$1 = $1 - num; print $0}' >${OUTPUTDIR}/dmesg_parsed
+	
+	cat ${OUTPUTDIR}/dmesg_parsed | grep 'GC_LATENCY: latency:' > ${OUTPUTDIR}/gc_latency_breakdown
+	echo "# timestamp	GC Total Latency (msec)		CP	Meta	Filemap	Cache	Read	Write\n" > ${OUTPUTDIR}/GC_latency_breakdown
+	cat ${OUTPUTDIR}/dmesg_parsed | grep 'gc_latency_breakdown total' | awk '{print $1, $5, $7, $9, $11, $13, $15, $17}' >>  ${OUTPUTDIR}/GC_latency_breakdown
+	rm ${OUTPUTDIR}/gc_latency_breakdown
+	
+	chown -R ${USER} ${OUTPUTDIR}
 
 	echo "==== End the experiment ===="
 }

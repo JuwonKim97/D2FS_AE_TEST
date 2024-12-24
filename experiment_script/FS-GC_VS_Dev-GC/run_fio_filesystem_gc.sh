@@ -21,7 +21,7 @@ main()
 	echo -e "n\n\n\n\n+256G\nw" | fdisk ${DEV_whole}
 	
 	# Create result root directory
-	mkdir ${OUTPUTDIR}
+	mkdir -p ${OUTPUTDIR}
 
 	# Disable ASLR
 	echo 0 > /proc/sys/kernel/randomize_va_space

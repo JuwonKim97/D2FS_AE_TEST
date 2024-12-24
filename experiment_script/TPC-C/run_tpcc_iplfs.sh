@@ -7,7 +7,7 @@ MNT=/mnt
 DATA=/exp_mysql_data
 DEV_whole=/dev/nvme3n1
 CUR_DIR=$(pwd)
-FILESYSTEM=(IPLFS_optimized)
+FILESYSTEM=(iplfs)
 OUTPUTDIR="iplfs_data/tpcc_IPLFS_exp_output_${FILESYSTEM}_`date "+%Y%m%d"`_`date "+%H%M"`"
 
 main()
@@ -67,6 +67,12 @@ main()
 	number=$(cat ${OUTPUTDIR}/dmesg | grep STARTT | sed 's/\]//g' |  awk '{print $2}') 
 	cat ${OUTPUTDIR}/dmesg | sed 's/\]//g' | sed 's/\[//g' | awk -v num="$number" '{$1 = $1 - num; print $0}' >${OUTPUTDIR}/dmesg_parsed
 
+	cat ${OUTPUTDIR}/dmesg_parsed | grep Interval_Mapping > ${OUTPUTDIR}/memory_footprint_tmp
+	echo "# timestamp	memory footprint (MB)\n" > ${OUTPUTDIR}/L2P_mapping_memory_footprint 
+	cat ${OUTPUTDIR}/memory_footprint_tmp | awk '{print $1, $5}'  >> ${OUTPUTDIR}/L2P_mapping_memory_footprint
+	rm ${OUTPUTDIR}/memory_footprint_tmp
+
+	chown -R ${USER} ${OUTPUTDIR}
 	echo "==== End the experiment ===="
 }
 main

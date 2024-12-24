@@ -57,7 +57,7 @@ main()
 	
 	cd ${YCSB}
 	su root -c 'echo STARTTTTTT > /dev/kmsg' 
-	sudo bin/ycsb run jdbc -P workloads/workloadf -P db.properties \
+	sudo bin/ycsb run jdbc -P ${CUR_DIR}/workloadf -P db.properties \
 		       	-p recordcount=${RECOUNT[i]} \
 	       		-p fieldlength=${fieldlength} \
 			-p operationcount=${OPCOUNT} \
@@ -80,6 +80,12 @@ main()
 				
 	cat ${OUTPUTDIR}/dmesg | sed 's/\]//g' | sed 's/\[//g' | awk -v num="$number" '{$1 = $1 - num; print $0}' >${OUTPUTDIR}/dmesg_parsed
 
+	cat ${OUTPUTDIR}/dmesg_parsed | grep 'GC_LATENCY: latency:' > ${OUTPUTDIR}/gc_latency_breakdown
+	echo "# timestamp	GC Total Latency (msec)		CP	Meta	Filemap	Cache	Read	Write\n" > ${OUTPUTDIR}/GC_latency_breakdown
+	cat ${OUTPUTDIR}/dmesg_parsed | grep 'gc_latency_breakdown total' | awk '{print $1, $5, $7, $9, $11, $13, $15, $17}' >>  ${OUTPUTDIR}/GC_latency_breakdown
+	rm ${OUTPUTDIR}/gc_latency_breakdown
+
+	chown -R ${USER} ${OUTPUTDIR}
 
 	echo "==== End the experiment ===="
 }

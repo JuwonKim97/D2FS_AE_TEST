@@ -1,0 +1,7 @@
+Xsteps				IPLFS		D2FS		zF2FS		F2FS
+TPC-C				712.676		597.335		489.605		1309.417	# (sec)
+YCSB-A				574.463		106.687		270.335		823.807		#update (msec)
+YCSB-F				553.983		73.535		254.079		792.063		#update (msec)
+YCSB-A		     	504.063		91.071		226.943		674.815		#read	(msec)
+YCSB-F				500.991		95.231		215.167		606.719		#read	(msec)
+Fileserver			58.500		243.200		426.400		550.000		#(ms)
