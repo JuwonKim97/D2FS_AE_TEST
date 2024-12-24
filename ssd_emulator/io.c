@@ -923,88 +923,7 @@ static unsigned int __do_perform_io_dsm(struct nvmev_proc_table *pe)
 		//length = (dsm_range[i].nlb + 1) << 9; /* zero-based */
 		length = (dsm_range[i].nlb) << 9; /* zero-based */
 		remaining = length;
-		//NVMEV_INFO("[JWDBG] %s: ofs: %ld len: %ld, lpn: 0x%lx ~ 0x%lx\n", __func__, offset, length, offset/PAGE_SIZE, (offset+length-1)/PAGE_SIZE);
 
-
-		//printk("%s: slpn: 0x%lx len: %lu", 
-		//		__func__, offset/PAGE_SIZE, length/PAGE_SIZE);
-
-//#define BUF_CNT_ 50
-		
-//		if (1) {
-//		if	(((offset/PAGE_SIZE) >> 29) == 3) {
-//			glb_old_stack[glb_cnt] = offset/PAGE_SIZE;
-//			glb_new_stack[glb_cnt] = offset/PAGE_SIZE + length/PAGE_SIZE - 1;
-//			glb_cnt ++;
-//			if (glb_cnt == BUF_CNT_) {
-////#ifdef PLEASE
-//				printk("%s \n \
-//						slba: 0x%llx elba: 0x%llx \n \
-//						slba: 0x%llx elba: 0x%llx \n \
-//						slba: 0x%llx elba: 0x%llx \n \
-//						slba: 0x%llx elba: 0x%llx \n \
-//						slba: 0x%llx elba: 0x%llx \n \
-//						slba: 0x%llx elba: 0x%llx \n \
-//						slba: 0x%llx elba: 0x%llx \n \
-//						slba: 0x%llx elba: 0x%llx \n \
-//						slba: 0x%llx elba: 0x%llx \n \
-//						slba: 0x%llx elba: 0x%llx \n \
-//						", __func__,
-//						glb_old_stack[0], glb_new_stack[0],
-//						glb_old_stack[1], glb_new_stack[1],
-//						glb_old_stack[2], glb_new_stack[2],
-//						glb_old_stack[3], glb_new_stack[3],
-//						glb_old_stack[4], glb_new_stack[4],
-//						glb_old_stack[5], glb_new_stack[5],
-//						glb_old_stack[6], glb_new_stack[6],
-//						glb_old_stack[7], glb_new_stack[7],
-//						glb_old_stack[8], glb_new_stack[8],
-//						glb_old_stack[9], glb_new_stack[9]
-//				//		glb_old_stack[10], glb_new_stack[10],
-//				//		glb_old_stack[11], glb_new_stack[11],
-//				//		glb_old_stack[12], glb_new_stack[12],
-//				//		glb_old_stack[13], glb_new_stack[13],
-//				//		glb_old_stack[14], glb_new_stack[14],
-//				//		glb_old_stack[15], glb_new_stack[15],
-//				//		glb_old_stack[16], glb_new_stack[16],
-//				//		glb_old_stack[17], glb_new_stack[17],
-//				//		glb_old_stack[18], glb_new_stack[18],
-//				//		glb_old_stack[19], glb_new_stack[19]
-//					//	old_stack[20], new_stack[20],
-//					//	old_stack[21], new_stack[21],
-//					//	old_stack[22], new_stack[22],
-//					//	old_stack[23], new_stack[23],
-//					//	old_stack[24], new_stack[24],
-//					//	old_stack[25], new_stack[25],
-//					//	old_stack[26], new_stack[26],
-//					//	old_stack[27], new_stack[27],
-//					//	old_stack[28], new_stack[28],
-//					//	old_stack[29], new_stack[29],
-//					//	old_stack[30], new_stack[30],
-//					//	old_stack[31], new_stack[31],
-//					//	old_stack[32], new_stack[32],
-//					//	old_stack[33], new_stack[33],
-//					//	old_stack[34], new_stack[34],
-//					//	old_stack[35], new_stack[35],
-//					//	old_stack[36], new_stack[36],
-//					//	old_stack[37], new_stack[37],
-//					//	old_stack[38], new_stack[38],
-//					//	old_stack[39], new_stack[39],
-//					//	old_stack[40], new_stack[40],
-//					//	old_stack[41], new_stack[41],
-//					//	old_stack[42], new_stack[42],
-//					//	old_stack[43], new_stack[43],
-//					//	old_stack[44], new_stack[44],
-//					//	old_stack[45], new_stack[45],
-//					//	old_stack[46], new_stack[46],
-//					//	old_stack[47], new_stack[47],
-//					//	old_stack[48], new_stack[48],
-//					//	old_stack[49], new_stack[49]
-//				);
-////#endif
-//				glb_cnt = 0;
-//			}
-//		}
 
 		while (remaining) {
 			size_t io_size;
@@ -1014,15 +933,16 @@ static unsigned int __do_perform_io_dsm(struct nvmev_proc_table *pe)
 
 			/* JW: change paddr to offset. need to verify. */
 			if (offset & PAGE_OFFSET_MASK) { 
-				NVMEV_ERROR("[JWDBG] %s: offset not aligned to PG. ofs: %lx len: %lx\n", __func__, 
-						offset, length);
+				//NVMEV_ERROR("[JWDBG] %s: offset not aligned to PG. ofs: %lx len: %lx\n", __func__, 
+				//		offset, length);
 				mem_offs = offset & PAGE_OFFSET_MASK;
 				if (io_size + mem_offs > PAGE_SIZE)
 					io_size = PAGE_SIZE - mem_offs;
 			}
-			if (io_size != PAGE_SIZE)
-				NVMEV_ERROR("[JWDBG] %s: iosize is not PGSIZE. iosize: %ld\n", __func__, 
-						io_size);
+			if (io_size != PAGE_SIZE) {
+				//NVMEV_ERROR("[JWDBG] %s: iosize is not PGSIZE. iosize: %ld\n", __func__, 
+				//		io_size);
+			}
 
 #ifdef MULTI_PARTITION_MTL
 			free_mem_addr(&vdev->ns[nsid], offset);//, tlist);
