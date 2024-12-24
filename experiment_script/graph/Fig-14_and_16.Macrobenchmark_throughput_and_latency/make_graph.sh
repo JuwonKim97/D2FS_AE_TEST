@@ -4,7 +4,6 @@ OUTPUT_THROUGHPUT=throughput
 OUTPUT_AVG_LAT=avg_lat
 OUTPUT_TAIL_LAT=99.95_lat
 
-echo -e "#\tDread\tDwrite\tCP\tMeta\tFilemap\tCache\tHread\tHwrite" > $OUTPUT
 
 #===============================================================================================#
 # TPC-C Data
@@ -125,3 +124,41 @@ D2FS_FILESERVER_TAIL_LAT=$(cat "$D2FS_FILESERVER"  | grep wrtfile | awk '{print 
 IPLFS_FILESERVER_TAIL_LAT=$(cat "$IPLFS_FILESERVER"  | grep wrtfile | awk '{print $21}')
 ZNS_FILESERVER_TAIL_LAT=$(cat "$ZNS_FILESERVER"  | grep wrtfile | awk '{print $21}')
 F2FS_FILESERVER_TAIL_LAT=$(cat "$F2FS_FILESERVER"  | grep wrtfile | awk '{print $21}')
+
+
+#===============================================================================================#
+# Plot Throughput Graph
+
+echo -e "#throughput" > $OUTPUT_THROUGHPUT
+echo -e "Xsteps\tIPLFS\tD2FS\tzF2FS\tF2FS" >> $OUTPUT_THROUGHPUT
+echo -e "TPC-C\\\n(Tx/sec)\t${IPLFS_TPCC_THROUGHPUT}\t${D2FS_TPCC_THROUGHPUT}\t${ZNS_TPCC_THROUGHPUT}\t${F2FS_TPCC_THROUGHPUT}" >> $OUTPUT_THROUGHPUT
+echo -e "YCSB-A\\\n(KOPS)\t${IPLFS_YCSBA_THROUGHPUT}\t${D2FS_YCSBA_THROUGHPUT}\t${ZNS_YCSBA_THROUGHPUT}\t${F2FS_YCSBA_THROUGHPUT}" >> $OUTPUT_THROUGHPUT
+echo -e "YCSB-F\\\n(KOPS)\t${IPLFS_YCSBF_THROUGHPUT}\t${D2FS_YCSBF_THROUGHPUT}\t${ZNS_YCSBF_THROUGHPUT}\t${F2FS_YCSBF_THROUGHPUT}" >> $OUTPUT_THROUGHPUT
+echo -e "Fileserver\\\n(KOPS)\t${IPLFS_FILESERVER_THROUGHPUT}\t${D2FS_FILESERVER_THROUGHPUT}\t${ZNS_FILESERVER_THROUGHPUT}\t${F2FS_FILESERVER_THROUGHPUT}" >> $OUTPUT_THROUGHPUT
+
+gnuplot plot_Fig-14.Macrobenchmark_throughput.gpi
+
+#===============================================================================================#
+# Plot Average Latency Graph
+
+echo -e "Xsteps\tIPLFS\tD2FS\tzF2FS\tF2FS" > $OUTPUT_AVG_LAT
+echo -e "TPC-C\t${IPLFS_TPCC_AVG_LAT}\t${D2FS_TPCC_AVG_LAT}\t${ZNS_TPCC_AVG_LAT}\t${F2FS_TPCC_AVG_LAT}" >> $OUTPUT_AVG_LAT
+echo -e "YCSB-A\t${IPLFS_YCSBA_AVG_LAT_UPDATE}\t${D2FS_YCSBA_AVG_LAT_UPDATE}\t${ZNS_YCSBA_AVG_LAT_UPDATE}\t${F2FS_YCSBA_AVG_LAT_UPDATE}\t#update (msec)" >> $OUTPUT_AVG_LAT
+echo -e "YCSB-F\t${IPLFS_YCSBF_AVG_LAT_UPDATE}\t${D2FS_YCSBF_AVG_LAT_UPDATE}\t${ZNS_YCSBF_AVG_LAT_UPDATE}\t${F2FS_YCSBF_AVG_LAT_UPDATE}\t#update (msec)" >> $OUTPUT_AVG_LAT
+echo -e "YCSB-A\t${IPLFS_YCSBA_AVG_LAT_READ}\t${D2FS_YCSBA_AVG_LAT_READ}\t${ZNS_YCSBA_AVG_LAT_READ}\t${F2FS_YCSBA_AVG_LAT_READ}\t#read (msec)" >> $OUTPUT_AVG_LAT
+echo -e "YCSB-F\t${IPLFS_YCSBF_AVG_LAT_READ}\t${D2FS_YCSBF_AVG_LAT_READ}\t${ZNS_YCSBF_AVG_LAT_READ}\t${F2FS_YCSBF_AVG_LAT_READ}\t#read (msec)" >> $OUTPUT_AVG_LAT
+echo -e "Fileserver\t${IPLFS_FILESERVER_AVG_LAT}\t${D2FS_FILESERVER_AVG_LAT}\t${ZNS_FILESERVER_AVG_LAT}\t${F2FS_FILESERVER_AVG_LAT}\t#wrtfile (msec)" >> $OUTPUT_AVG_LAT
+
+gnuplot plot_Fig-16-a.Macrobenchmark_avg_latency.gpi
+
+# Plot 99.95th Latency Graph
+echo -e "Xsteps\tIPLFS\tD2FS\tzF2FS\tF2FS" > $OUTPUT_TAIL_LAT
+echo -e "TPC-C\t${IPLFS_TPCC_TAIL_LAT}\t${D2FS_TPCC_TAIL_LAT}\t${ZNS_TPCC_TAIL_LAT}\t${F2FS_TPCC_TAIL_LAT}\t# (sec)" >> $OUTPUT_TAIL_LAT
+echo -e "YCSB-A\t${IPLFS_YCSBA_TAIL_LAT_UPDATE}\t${D2FS_YCSBA_TAIL_LAT_UPDATE}\t${ZNS_YCSBA_TAIL_LAT_UPDATE}\t${F2FS_YCSBA_TAIL_LAT_UPDATE}\t#update (msec)" >> $OUTPUT_TAIL_LAT
+echo -e "YCSB-F\t${IPLFS_YCSBF_TAIL_LAT_UPDATE}\t${D2FS_YCSBF_TAIL_LAT_UPDATE}\t${ZNS_YCSBF_TAIL_LAT_UPDATE}\t${F2FS_YCSBF_TAIL_LAT_UPDATE}\t#update (msec)" >> $OUTPUT_TAIL_LAT
+echo -e "YCSB-A\t${IPLFS_YCSBA_TAIL_LAT_READ}\t${D2FS_YCSBA_TAIL_LAT_READ}\t${ZNS_YCSBA_TAIL_LAT_READ}\t${F2FS_YCSBA_TAIL_LAT_READ}\t#read (msec)" >> $OUTPUT_TAIL_LAT
+echo -e "YCSB-F\t${IPLFS_YCSBF_TAIL_LAT_READ}\t${D2FS_YCSBF_TAIL_LAT_READ}\t${ZNS_YCSBF_TAIL_LAT_READ}\t${F2FS_YCSBF_TAIL_LAT_READ}\t#read (msec)" >> $OUTPUT_TAIL_LAT
+echo -e "Fileserver\t${IPLFS_FILESERVER_TAIL_LAT}\t${D2FS_FILESERVER_TAIL_LAT}\t${ZNS_FILESERVER_TAIL_LAT}\t${F2FS_FILESERVER_TAIL_LAT}\t#wrtfile (msec)" >> $OUTPUT_TAIL_LAT
+
+gnuplot plot_Fig-16-b.Macrobenchmark_tail_latency.gpi
+

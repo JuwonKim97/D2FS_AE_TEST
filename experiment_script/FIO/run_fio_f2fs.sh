@@ -6,7 +6,7 @@ DEV=(/dev/nvme3n1p1)
 DEV_whole=/dev/nvme3n1
 CUR_DIR=$(pwd)
 FIO_PATH=(/home/juwon/fio_src)
-FILESYSTEM=(vanilla_dsm_waf)
+FILESYSTEM=(f2fs)
 OUTPUTDIR="f2fs_data/fio_F2FS_exp_output_${FILESYSTEM}_`date "+%Y%m%d"`_`date "+%H%M"`"
 IO_TYPE=(randwrite)
 
@@ -111,17 +111,11 @@ main()
 			   python ../general_resource/sum.py ${OUTPUTDIR_FS_JOB}/4k_iops. ${numjob} > ${OUTPUTDIR_FS_JOB}/kiops_sum
 			   dmesg > ${OUTPUTDIR_FS_JOB}/dmesg
 
-   	  		   echo "fb end";
-			   
-			   cp throughput_waf.gpi  ${OUTPUTDIR_FS_JOB}/
-			   cp throughput_mgcmd.gpi  ${OUTPUTDIR_FS_JOB}/
-			   cp throughput_gclog_mem.gpi  ${OUTPUTDIR_FS_JOB}/
 			   chown -R juwon ${OUTPUTDIR}
 
 			   echo "==== Workload complete ===="
 
 			   echo "==== End the experiment ===="
-#dmesg > ${OUTPUTDIR_FS_JOB}/dmesg_aft_umount
 		   done
 	   	done
 		done
