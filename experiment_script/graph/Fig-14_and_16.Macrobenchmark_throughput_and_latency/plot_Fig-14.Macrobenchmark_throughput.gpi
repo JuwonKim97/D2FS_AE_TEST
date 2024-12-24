@@ -7,7 +7,7 @@ fnn(v) = sprintf("%d", v)
 jw_fnn(v) = (v < 100)? fn(v) : fnn(v)
 
 #set output "./graph_fio_cmp_kiops.eps"
-set output "./macro_throughput.eps"
+set output "./Fig-14.Macrogenchmark_throughput.eps"
 set term postscript size 7.5,3.
 set key outside top horizontal reverse Left font "Helvetica, 32"
 

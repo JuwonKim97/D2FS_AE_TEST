@@ -35,7 +35,7 @@ main()
 	cp -rp ${DATA}/cold_20G /tmp_mnt/cold_20G
 	
 	# Create result root directory
-	mkdir ${OUTPUTDIR}
+	mkdir -p ${OUTPUTDIR}
 
 	# Disable ASLR
 	echo 0 > /proc/sys/kernel/randomize_va_space

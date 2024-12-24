@@ -10,7 +10,7 @@ max_4(w, x, y, z) = max_(w, max_( max_(x, y), z) )
 
 
 #set output "./graph_fio_cmp_kiops.eps"
-set output "./macro_latencys_99.95.eps"
+set output "./Fig-16-b.Macrobenchmark_tail_latency.eps"
 set term postscript size 7.5, 3.0
 #set term postscript size 7.5, 2.2
 set key outside top horizontal reverse Left font "Helvetica, 32"
@@ -110,7 +110,7 @@ set label "WrtFile\n(msec)" at screen (r+rr)/2, screen h center front font "Helv
 
 unset key
 
-plot '99.95'\
+plot '99.95_lat'\
 		  u ($3/max_4($2, $3, $4, $5)):xtic(1) t 'D2FS' lc 'blue', \
 		 '' u ($2/max_4($2, $3, $4, $5)):xtic(1) t 'IPLFS' lc 'red', \
 		 '' u ($4/max_4($2, $3, $4, $5)):xtic(1) t 'zF2FS' lc 'dark-violet', \

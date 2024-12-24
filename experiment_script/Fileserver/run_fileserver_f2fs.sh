@@ -22,7 +22,7 @@ main()
 	echo -e "n\n\n\n\n\nw" | fdisk ${DEV_whole}
 	
 	# Create result root directory
-	mkdir ${OUTPUTDIR}
+	mkdir -p ${OUTPUTDIR}
 
 	# Disable ASLR
 	echo 0 > /proc/sys/kernel/randomize_va_space
@@ -34,7 +34,7 @@ main()
 		OUTPUTDIR_FS=${OUTPUTDIR}/${fs}
 
 		# Craete directory for filesystem
-		mkdir ${OUTPUTDIR_FS}
+		mkdir -p ${OUTPUTDIR_FS}
 
  	    case $fs in
 		    "write")
