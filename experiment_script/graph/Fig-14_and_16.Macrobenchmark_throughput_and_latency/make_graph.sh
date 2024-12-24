@@ -1,11 +1,34 @@
 #!/bin/bash
 
-OUTPUT=gc_latency_breakdown_data
+OUTPUT_THROUGHPUT=throughput
+OUTPUT_AVG_LAT=avg_lat
+OUTPUT_TAIL_LAT=99.95_lat
 
 echo -e "#\tDread\tDwrite\tCP\tMeta\tFilemap\tCache\tHread\tHwrite" > $OUTPUT
 
-D2FS_FIO=$(find ./d2fs_FIO -name "GC_latency_breakdown")
-D2FS_TPCC=$(find ./d2fs_TPC-C -name "GC_latency_breakdown")
+D2FS_TPCC=$(find ./d2fs_TPC-C -name "result.txt")
+IPLFS_TPCC=$(find ./iplfs_TPC-C -name "result.txt")
+ZNS_TPCC=$(find ./zns_TPC-C -name "result.txt")
+F2FS_TPCC=$(find ./f2fs_TPC-C -name "result.txt")
+
+# TPC-C Throughput
+D2FS_TPCC_THROUGHPUT=$(cat "$D2FS_TPCC"  | grep trx | sed 's/,//g' | awk '{print $3/$1}')
+IPLFS_TPCC_THROUGHPUT=$(cat "$IPLFS_TPCC"  | grep trx | sed 's/,//g' | awk '{print $3/$1}')
+ZNS_TPCC_THROUGHPUT=$(cat "$ZNS_TPCC"  | grep trx | sed 's/,//g' | awk '{print $3/$1}')
+F2FS_TPCC_THROUGHPUT=$(cat "$F2FS_TPCC"  | grep trx | sed 's/,//g' | awk '{print $3/$1}')
+
+# TPC-C Average Latency
+D2FS_TPCC_AVG_LAT=$(cat "$D2FS_TPCC"  | awk '/Raw Results2/ {exit} {print}' | grep '\[1\]' | awk '{print $7}')
+IPLFS_TPCC_AVG_LAT=$(cat "$IPLFS_TPCC"  | awk '/Raw Results2/ {exit} {print}' | grep '\[1\]' | awk '{print $7}')
+ZNS_TPCC_AVG_LAT=$(cat "$ZNS_TPCC"  | awk '/Raw Results2/ {exit} {print}' | grep '\[1\]' | awk '{print $7}')
+F2FS_TPCC_AVG_LAT=$(cat "$F2FS_TPCC"  | awk '/Raw Results2/ {exit} {print}' | grep '\[1\]' | awk '{print $7}')
+
+# TPC-C 99.95th Latency
+D2FS_TPCC_TAIL_LAT=$(cat "$D2FS_TPCC"  | grep trx | sed 's/,//g' | awk '{print $11}')
+IPLFS_TPCC_TAIL_LAT=$(cat "$IPLFS_TPCC"  | grep trx | sed 's/,//g' | awk '{print $11}')
+ZNS_TPCC_TAIL_LAT=$(cat "$ZNS_TPCC"  | grep trx | sed 's/,//g' | awk '{print $11}')
+F2FS_TPCC_TAIL_LAT=$(cat "$F2FS_TPCC"  | grep trx | sed 's/,//g' | awk '{print $11}')
+
 D2FS_YCSBA=$(find ./d2fs_YCSB-A -name "GC_latency_breakdown")
 D2FS_YCSBF=$(find ./d2fs_YCSB-F -name "GC_latency_breakdown")
 D2FS_FILESERVER=$(find ./d2fs_Fileserver -name "GC_latency_breakdown")

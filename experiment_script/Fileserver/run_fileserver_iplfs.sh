@@ -7,7 +7,7 @@ MNT=/mnt
 
 DEV_whole=/dev/nvme3n1
 CUR_DIR=$(pwd)
-FILESYSTEM=(IPLFS_optimized)
+FILESYSTEM=(iplfs)
 OUTPUTDIR="iplfs_data/filebench_IPLFS_exp_output_"$WORKLOAD"_`date "+%Y%m%d"`_`date "+%H%M"`"
 IO_TYPE=(randwrite)
 NUM_JOBS=(4)
@@ -94,6 +94,10 @@ main()
 
 			   cat ${OUTPUTDIR_FS_JOB}/dmesg | sed 's/\]//g' | sed 's/\[//g' | awk -v num="$number" '{$1 = $1 - num; print $0}' >${OUTPUTDIR_FS_JOB}/dmesg_parsed
 
+			   cat ${OUTPUTDIR_FS_JOB}/dmesg_parsed | grep Interval_Mapping > ${OUTPUTDIR_FS_JOB}/memory_footprint_tmp
+			   echo "# timestamp	memory footprint (MB)\n" > ${OUTPUTDIR_FS_JOB}/L2P_mapping_memory_footprint 
+		           cat ${OUTPUTDIR_FS_JOB}/memory_footprint_tmp | awk '{print $1, $5}'  >> ${OUTPUTDIR_FS_JOB}/L2P_mapping_memory_footprint
+		           rm ${OUTPUTDIR_FS_JOB}/memory_footprint_tmp
 
 			   cat ${OUTPUTDIR_FS_JOB}/result.txt | grep -e Summary > ${OUTPUTDIR_FS_JOB}/result_time
 			   cat ${OUTPUTDIR_FS_JOB}/result_time | awk 'BEGIN {t=5} {print t, $6/1000} {t+=5}' > ${OUTPUTDIR_FS_JOB}/kiops_sum

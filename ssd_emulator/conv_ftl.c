@@ -640,15 +640,20 @@ void compaction1(struct nvmev_ns *ns)
 				total_created_zone_sz += created_znodes * ZNODE_SIZE / 1024;
 				total_dealloc_zone_sz += ms_info->dealloc_znode * ZNODE_SIZE / 1024;
 
+                //printk("%s: [MEM_CALC] part%d IM: %d PT: %d interval: %d MB znode: %u %u KB v/i %u / %u KBi written: %u MB dealloc_ms: %d MB compaction !!\n", 
+				//		__func__, i, sz, pt_sz, total_MScnt*16, valid_znode, znode_sz/1024, 
+				//		created_znodes * ZNODE_SIZE / 1024, 
+				//		ms_info->dealloc_znode * ZNODE_SIZE / 1024, ms_info->global_eMSidx * 16, 
+				//	   	dealloc_ms);
+
+//		printk("-----------------partno: %u end------------", i);
         }
-        printk("%s: Memory_Footprint_of_Interval_Mapping_FTL: %d MB", 
-				__func__, total_sz);
-        //printk("[COMPACTION_MEM_CALC] total result IM: %d PT: %d interval: %d MB znode: %u KB v/i: %u / %u KB dealloc_ms: %d MB dirty_ms: %u (%u MB) compact_ms: %u (%u MB)", 
-	//			total_sz, total_pt_sz, total_total_MScnt*16, 
-	//			total_znode_sz, 
-	//			total_created_zone_sz, total_dealloc_zone_sz,
-	//			total_dealloc_ms, dirty_ms_cnt_total, 
-	//			dirty_ms_cnt_total*MSblks*4/1024, compaction_cnt, compaction_cnt*MSblks*4/1024 );
+        printk("Memory Footprint: Interval_Mapping: %d PT: %d interval: %d MB znode: %u KB v/i: %u / %u KB dealloc_ms: %d MB dirty_ms: %u (%u MB) compact_ms: %u (%u MB) \n", 
+				 total_sz, total_pt_sz, total_total_MScnt*16, 
+				total_znode_sz, 
+				total_created_zone_sz, total_dealloc_zone_sz,
+				total_dealloc_ms, dirty_ms_cnt_total, 
+				dirty_ms_cnt_total*MSblks*4/1024, compaction_cnt, compaction_cnt*MSblks*4/1024 );
 //	printk("======================end==========================");
 }
 #else
@@ -828,7 +833,7 @@ void compaction1(struct nvmev_ns *ns)
 				//		ms_info->dealloc_znode * ZNODE_SIZE / 1024, ms_info->global_eMSidx * 16, 
 				//	   	dealloc_ms);
         }
-        printk("%s: [COMPACTION_MEM_CALC] total result IM: %d PT: %d interval: %d MB znode: %u KB v/i: %u / %u KB dealloc_ms: %d MB!!\n", 
+        printk("Memory Footprint: Interval_Mapping: %d PT: %d interval: %d MB znode: %u KB v/i: %u / %u KB dealloc_ms: %d MB!!\n", 
 				__func__, total_sz, total_pt_sz, total_total_MScnt*16, 
 				total_znode_sz, 
 				total_created_zone_sz, total_dealloc_zone_sz,
@@ -2341,14 +2346,19 @@ static void mark_line_free(struct conv_ftl *conv_ftl, struct ppa *ppa)
 static inline void print_WAF(struct nvmev_ns *ns)
 {
 	if (ns->write_volume_host) {
-		//unsigned int waf = 
-		//	(100* (ns->write_volume_gc + ns->write_volume_host)) / ns->write_volume_host;
-		//unsigned int total_waf = 
-		//	(100* (ns->total_write_volume_gc + ns->total_write_volume_host)) 
+		//float waf = 
+		//	(float) ((float) (ns->write_volume_gc + ns->write_volume_host)) / ns->write_volume_host;
+		//float total_waf = 
+		//	(float) ((float) (ns->total_write_volume_gc + ns->total_write_volume_host)) 
 		//	/ ns->total_write_volume_host;
-		//printk("%s: WAF: %u percent gc: %llu KB write_req: %llu KB total: %llu KB total WAF: %u percent", 
-		//	__func__, waf, ns->write_volume_gc*4, ns->write_volume_host*4, 
-		//	ns->total_write_volume_host*4, total_waf);
+	//	unsigned int waf = 
+	//		(100* (ns->write_volume_gc + ns->write_volume_host)) / ns->write_volume_host;
+	//	unsigned int total_waf = 
+	//		(100* (ns->total_write_volume_gc + ns->total_write_volume_host)) 
+	//		/ ns->total_write_volume_host;
+	//	printk("%s: WAF: %u percent gc: %llu KB write_req: %llu KB total: %llu KB total WAF: %u percent", 
+	//		__func__, waf, ns->write_volume_gc*4, ns->write_volume_host*4, 
+	//		ns->total_write_volume_host*4, total_waf);
 	}
 }
 
@@ -2749,7 +2759,7 @@ bool conv_write(struct nvmev_ns *ns, struct nvmev_request *req, struct nvmev_res
 		end_lpn -= START_OFS_IN_MAIN_PART;
 		if (min_slpn[NO_PARTITION(start_lpn)] > start_lpn){
 			min_slpn[NO_PARTITION(start_lpn)] = start_lpn;
-			//printk("%s: type: %lld start_lpn: 0x%llx", __func__, NO_PARTITION(start_lpn), start_lpn);
+			printk("%s: type: %lld start_lpn: 0x%llx", __func__, NO_PARTITION(start_lpn), start_lpn);
 		}
 	}
 
@@ -2841,6 +2851,187 @@ bool conv_write(struct nvmev_ns *ns, struct nvmev_request *req, struct nvmev_res
 	return true;
 }
 #else 
+/* zone mapping */
+
+/* write for zone mapping */
+//bool lm_write(struct nvmev_ns *ns, struct nvmev_request *req, struct nvmev_result *ret)
+//{
+//	struct conv_ftl *conv_ftls = (struct conv_ftl *)ns->ftls;
+//	struct conv_ftl *conv_ftl = &conv_ftls[0];
+//
+//	/* wbuf and spp are shared by all instances */
+//	struct ssdparams *spp = &conv_ftl->ssd->sp;
+//	struct buffer * wbuf = conv_ftl->ssd->write_buffer;
+//
+//	struct nvme_command *cmd = req->cmd;
+//	uint64_t lba = cmd->rw.slba;
+//	uint64_t nr_lba = (cmd->rw.length + 1);
+//	uint64_t start_lpn = lba / spp->secs_per_pg;
+//	uint64_t end_lpn = (lba + nr_lba - 1) / spp->secs_per_pg;
+//
+//	uint64_t lpn, local_lpn, logical_zoneno;
+//	uint32_t nr_parts = ns->nr_parts;
+//
+//	uint64_t nsecs_start = req->nsecs_start;
+//	uint64_t nsecs_completed = 0, nsecs_latest;
+//	uint64_t nsecs_xfer_completed;
+//	uint32_t allocated_buf_size;
+//	struct ppa ppa, *zone_map_ent, calc_ppa;
+//	struct nand_cmd swr;
+//	
+//#ifdef WAF	
+//	try_print_WAF(ns);
+//#endif
+//
+//	int no_partition = NO_LOCAL_PARTITION(start_lpn / nr_parts);
+//	if (no_partition == COLD_DATA_PARTITION || no_partition == COLD_NODE_PARTITION)
+//		printk("%s: host write on cold partition!! type: %d lpn: %lld", __func__, no_partition, start_lpn);
+//
+//	NVMEV_ASSERT(no_partition == NO_LOCAL_PARTITION(end_lpn / nr_parts));
+//
+//#ifndef COUPLED_GC_MTL
+//	struct ppa (*write_handler) (struct conv_ftl *conv_ftl, uint64_t local_lpn, int no_partition);
+//#else
+//	struct ppa (*write_handler) (struct conv_ftl *conv_ftl, uint64_t local_lpn, int no_partition, struct nvmev_result *ret);
+//#endif
+//#ifndef GURANTEE_SEQ_WRITE
+//	void (*line_handler) (struct conv_ftl *conv_ftl, uint32_t io_type, int no_partition,
+//								struct ppa *ppa);
+//#endif
+//	static int print = 1;
+//	NVMEV_ASSERT(conv_ftls);
+//	NVMEV_DEBUG("conv_write: start_lpn=%lld, len=%d, end_lpn=%lld", start_lpn, nr_lba, end_lpn);
+//#ifdef JWDBG_CONV_FTL
+//	/*static int print_ = 0;
+//	int print_interval = 1000;
+//	if (print_ % print_interval == 0){
+//		//printk("%s: slpn=%lld, len=%lld, elpn=%lld lpn: 0x%llx ~ 0x%llx", 
+//		//	__func__, start_lpn, nr_lba, end_lpn, 
+//		//	start_lpn, end_lpn);
+//	}
+//	print_ ++ ;*/
+//#endif
+//
+//
+//
+//	if (IS_META_PARTITION(no_partition)){
+//		/* TODO: ftl range check for meta partition */
+//		write_handler = write_meta_page_mapping_handler;
+//#ifndef GURANTEE_SEQ_WRITE
+//		line_handler  = advance_write_pointer;
+//#endif
+//	} else if (IS_MAIN_PARTITION(no_partition)){
+//		write_handler = write_zone_mapping_handler;
+//#ifndef GURANTEE_SEQ_WRITE
+//		line_handler  = classify_line;
+//#endif
+//		if (out_of_partition(conv_ftl, end_lpn/nr_parts)){
+//			if (print){
+//	    		printk("conv_write: lpn passed FTL range(start_lpn=0x%llx,tt_pgs=%ld)\n", start_lpn, spp->tt_pgs);
+//				print = 0;
+//			}
+//			NVMEV_ASSERT(0);
+//	    	//NVMEV_ERROR("conv_write: lpn passed FTL range(start_lpn=0x%llx,tt_pgs=%ld)\n", start_lpn, spp->tt_pgs);
+//	    	return false;
+//		}
+//	} else {
+//		NVMEV_ERROR("%s: partition %d error\n", __func__, no_partition);
+//		return false;
+//	}
+//
+//	allocated_buf_size = buffer_allocate(wbuf, LBA_TO_BYTE(nr_lba));
+//
+//	if (allocated_buf_size < LBA_TO_BYTE(nr_lba))
+//		return false;
+//
+//	nsecs_latest = nsecs_start;
+//	nsecs_latest = ssd_advance_write_buffer(
+//			conv_ftl->ssd, nsecs_latest, LBA_TO_BYTE(nr_lba));
+//	nsecs_xfer_completed = nsecs_latest;
+//
+//	swr.type = USER_IO;
+//	swr.cmd = NAND_WRITE;
+//	swr.stime = nsecs_latest;
+//	swr.interleave_pci_dma = false;
+//
+//	struct line *tmp_line;
+//	static uint64_t min_slpn[NO_TYPE] = {0xffffffff, 0xffffffff, \
+//		0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff};
+//	if (IS_MAIN_PARTITION(no_partition)){
+//		start_lpn -= START_OFS_IN_MAIN_PART;
+//		end_lpn -= START_OFS_IN_MAIN_PART;
+//		if (min_slpn[NO_PARTITION(start_lpn)] > start_lpn){
+//			min_slpn[NO_PARTITION(start_lpn)] = start_lpn;
+//			printk("%s: type: %lld start_lpn: 0x%llx", __func__, NO_PARTITION(start_lpn), start_lpn);
+//		}
+//	}
+//	
+//	//printk("lm_write: start_lpn= 0x%lx, end_lpn= 0x%lx", start_lpn, end_lpn);
+//	
+//#ifdef WAF
+//	ns->write_volume_host += (end_lpn - start_lpn + 1);
+//	ns->total_write_volume_host += (end_lpn - start_lpn + 1);
+//#endif
+//	/* meta partition. page mapping */
+//	for (lpn = start_lpn; lpn <= end_lpn; lpn++) {
+//	    conv_ftl = &conv_ftls[lpn % nr_parts];
+//	    local_lpn = lpn / nr_parts;
+//#ifndef COUPLED_GC_MTL
+//		ppa = write_handler(conv_ftl, local_lpn, no_partition);
+//#else
+//		ppa = write_handler(conv_ftl, local_lpn, no_partition, ret);
+//#endif
+//#ifdef JWDBG_CONV_FTL
+//		//printk("[JWDBG] %s: lpn: 0x%llx local lpn: 0x%llx ppa: 0x%llx %lld\n", 
+//		//		__func__, lpn, local_lpn, ppa.ppa, ppa.ppa);
+//#endif
+//	    /* update rmap */
+//	    set_rmap_ent(conv_ftl, local_lpn, &ppa);
+//
+//	    check_mark_page_valid(conv_ftl, &ppa, local_lpn);
+//	    mark_page_valid(conv_ftl, &ppa);
+//
+//	    /* need to advance the write pointer here */
+//#ifdef GURANTEE_SEQ_WRITE
+//	    advance_write_pointer(conv_ftl, USER_IO, no_partition);
+//#else
+//	    line_handler(conv_ftl, USER_IO, no_partition, &ppa);
+//#endif
+//	    /* Aggregate write io in flash page */
+//	    if (last_pg_in_wordline(conv_ftl, &ppa)) {
+//	        swr.xfer_size = spp->pgsz * spp->pgs_per_oneshotpg;
+//	        swr.ppa = &ppa;
+//	        nsecs_completed = ssd_advance_nand(conv_ftl->ssd, &swr);
+//	        nsecs_latest = (nsecs_completed > nsecs_latest) ? nsecs_completed : nsecs_latest;
+//
+//	        enqueue_writeback_io_req(req->sq_id, nsecs_completed, wbuf, spp->pgs_per_oneshotpg * spp->pgsz);
+//	    }
+//
+//#ifndef MULTI_PARTITION_FTL
+//	    consume_write_credit(conv_ftl);
+//	    check_and_refill_write_credit(conv_ftl);
+//#else
+//	    consume_write_credit(conv_ftl, no_partition);
+//#ifndef  COUPLED_GC_MTL
+//	    check_and_refill_write_credit(conv_ftl, no_partition);
+//#else
+//	    check_and_refill_write_credit(conv_ftl, no_partition, ret);
+//#endif
+//
+//#endif
+//	}
+//
+//	if ((cmd->rw.control & NVME_RW_FUA) || (spp->write_early_completion == 0)) {
+//		/* Wait all flash operations */
+//		ret->nsecs_target = nsecs_latest;
+//	} else {
+//		/* Early completion */
+//		ret->nsecs_target = nsecs_xfer_completed;
+//	}
+//	ret->status = NVME_SC_SUCCESS;
+//
+//	return true;
+//}
 #endif
 
 #ifdef DISCARD_ENABLED

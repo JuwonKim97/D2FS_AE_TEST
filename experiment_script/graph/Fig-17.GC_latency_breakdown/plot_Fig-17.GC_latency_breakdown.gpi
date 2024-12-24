@@ -2,7 +2,7 @@
 set terminal postscript eps enhanced color dashed dashlength 3 \
 	                linewidth 2 rounded font "Helvetica, 40"
 
-set output "./gc_latency_breakdown.eps"
+set output "./Fig-17.GC_latency_breakdown.eps"
 #set key inside horizontal font "Helvetica, 14"
 #set key inside left bottom horizontal font "Helvetica, 28"
 #set key inside left bottom vertical reverse Left font "Helvetica, 28"
@@ -58,31 +58,6 @@ set arrow from screen l+2*d, screen h-gap to screen l+2*d, screen h+gap nohead
 set arrow from screen l+3*d, screen h-gap to screen l+3*d, screen h+gap nohead
 set arrow from screen l+4*d, screen h-gap to screen l+4*d, screen h+gap nohead
 set arrow from screen l+5*d, screen h-gap to screen l+5*d, screen h+gap nohead
-#set arrow from screen r, screen h-gap to screen r, screen h+gap nohead
-
-#set object 5 rectangle behind at screen (2*l+1*d)/2, screen h size char strlen("Fio")-0.3, \
-#	 char 0.2 front fillcolor rgb "white" fillstyle solid noborder
-#set label "Fio" at screen (2*l+1*d)/2, screen h center front font "Helvetica, 28"
-#
-#set object 3 rectangle behind at screen (2*l+3*d)/2, screen h size char strlen("Varmail")-1.5, \
-#	 char 0.2 front fillcolor rgb "white" fillstyle solid noborder
-#set label "Varmail" at screen (2*l+3*d)/2, screen h center front font "Helvetica, 28"
-#
-#set object 4 rectangle behind at screen (2*l+5*d)/2, screen h size char strlen("Fileserver")-3, \
-#	 char 0.2 front fillcolor rgb "white" fillstyle solid noborder
-#set label "Fileserver" at screen (2*l+5*d)/2, screen h center front font "Helvetica, 28"
-#
-#set object 1 rectangle behind at screen (2*l+7*d)/2, screen h size char strlen("YCSB-A")-0.5, \
-#	 char 0.2 front fillcolor rgb "white" fillstyle solid noborder
-#set label "YCSB-A" at screen (2*l+7*d)/2, screen h center front font "Helvetica, 28"
-#
-#set object 2 rectangle behind at screen (2*l+9*d)/2, screen h size char strlen("YCSB-F")-0.5, \
-#	 char 0.2 front fillcolor rgb "white" fillstyle solid noborder
-#set label "YCSB-F" at screen (2*l+9*d)/2, screen h center front font "Helvetica, 28"
-#
-#set object 6 rectangle behind at screen (2*l+11*d)/2, screen h size char strlen("TPC-C")-0.3, \
-#         char 0.2 front fillcolor rgb "white" fillstyle solid noborder
-#set label "TPC-C" at screen (2*l+11*d)/2, screen h center front font "Helvetica, 28"
 
 
 set object 5 rectangle behind at screen (2*l+1*d)/2, screen h size char strlen("FIO")-0.3, \
@@ -106,13 +81,6 @@ set object 3 rectangle behind at screen (2*l+9*d)/2, screen h size char strlen("
 set label "Fileserver" at screen (2*l+9*d)/2, screen h center front font "Helvetica, 36"
 
 
-#set object 6 rectangle behind at screen (2*l+11*d)/2, screen h size char strlen("TPC-C")-0.3, \
-#         char 0.2 front fillcolor rgb "white" fillstyle solid noborder
-#set label "TPC-C" at screen (2*l+11*d)/2, screen h center front font "Helvetica, 28"
-
-
-
-# 점선
 set arrow from 1.5, graph 0 to 1.5, graph 1 nohead dashtype 2 lw 2
 set arrow from 3.5, graph 0 to 3.5, graph 1 nohead dashtype 2 lw 2
 set arrow from 5.5, graph 0 to 5.5, graph 1 nohead dashtype 2 lw 2
@@ -129,7 +97,7 @@ set style histogram rowstacked title offset character 0, 0, 0
 set style data histograms
 
 plot \
-     'gcb_data' using ($3/1000):xtic(1) fs pattern 5 lc 'blue' t 'Dev-write', \
+     'gc_latency_breakdown_data' using ($3/1000):xtic(1) fs pattern 5 lc 'blue' t 'Dev-write', \
 	 ''	using ($2/1000) fs pattern 4 lc 'red' t 'Dev-read', \
      '' using ($9/1000) fs pattern 2 lc 'blue' t 'FS-write', \
      '' using ($8/1000) fs pattern 2 lc 'red' t 'FS-read', \

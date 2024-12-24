@@ -115,9 +115,9 @@ main()
 
 		           cat ${OUTPUTDIR_FS_JOB}/dmesg |  sed 's/\]//g' | sed 's/\[//g' | awk -v num="$number" '{$1 = $1 - num; print $0}' > ${OUTPUTDIR_FS_JOB}/dmesg_parsed
 		           
-			   cat ${OUTPUTDIR_FS_JOB}/dmesg_parsed | grep Memory_Footprint_of_Interval_Mapping_FTL > ${OUTPUTDIR_FS_JOB}/memory_footprint_tmp
+			   cat ${OUTPUTDIR_FS_JOB}/dmesg_parsed | grep Interval_Mapping > ${OUTPUTDIR_FS_JOB}/memory_footprint_tmp
 			   echo "# timestamp	memory footprint (MB)\n" > ${OUTPUTDIR_FS_JOB}/L2P_mapping_memory_footprint 
-		           cat ${OUTPUTDIR_FS_JOB}/memory_footprint_tmp | awk '{print $1, $4}'  >> ${OUTPUTDIR_FS_JOB}/L2P_mapping_memory_footprint
+		           cat ${OUTPUTDIR_FS_JOB}/memory_footprint_tmp | awk '{print $1, $5}'  >> ${OUTPUTDIR_FS_JOB}/L2P_mapping_memory_footprint
 		           rm ${OUTPUTDIR_FS_JOB}/memory_footprint_tmp
 
 			   chown -R juwon ${OUTPUTDIR}

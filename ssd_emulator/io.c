@@ -866,13 +866,145 @@ static unsigned int __do_perform_io_dsm(struct nvmev_proc_table *pe)
 	void *vaddr = kmap_atomic_pfn(PRP_PFN(paddr));
 	struct nvme_dsm_range *dsm_range = (struct nvme_dsm_range *) vaddr;
 	
+	//static int dsm_cnt = 0, dsm_cid_stack[BUF_CNT_];	
+	//dsm_cid_stack[dsm_cnt] = pe->command_id;
+	//dsm_cnt ++;
+	//if (dsm_cnt == BUF_CNT_) {
+	//	printk("%s \n \
+	//			pe cid: 0x%llx \n \
+	//			pe cid: 0x%llx \n \
+	//			pe cid: 0x%llx \n \
+	//			pe cid: 0x%llx \n \
+	//			pe cid: 0x%llx \n \
+	//			pe cid: 0x%llx \n \
+	//			pe cid: 0x%llx \n \
+	//			pe cid: 0x%llx \n \
+	//			pe cid: 0x%llx \n \
+	//			pe cid: 0x%llx \n \
+	//			pe cid: 0x%llx \n \
+	//			pe cid: 0x%llx \n \
+	//			pe cid: 0x%llx \n \
+	//			pe cid: 0x%llx \n \
+	//			pe cid: 0x%llx \n \
+	//			pe cid: 0x%llx \n \
+	//			pe cid: 0x%llx \n \
+	//			pe cid: 0x%llx \n \
+	//			pe cid: 0x%llx \n \
+	//			pe cid: 0x%llx \n \
+	//			", __func__,
+	//			dsm_cid_stack[0], 
+	//			dsm_cid_stack[1], 
+	//			dsm_cid_stack[2], 
+	//			dsm_cid_stack[3], 
+	//			dsm_cid_stack[4], 
+	//			dsm_cid_stack[5], 
+	//			dsm_cid_stack[6], 
+	//			dsm_cid_stack[7], 
+	//			dsm_cid_stack[8], 
+	//			dsm_cid_stack[9], 
+	//			dsm_cid_stack[10],
+	//			dsm_cid_stack[11],
+	//			dsm_cid_stack[12],
+	//			dsm_cid_stack[13],
+	//			dsm_cid_stack[14],
+	//			dsm_cid_stack[15],
+	//			dsm_cid_stack[16],
+	//			dsm_cid_stack[17],
+	//			dsm_cid_stack[18],
+	//			dsm_cid_stack[19]);
+	//	dsm_cnt == 0;
+	//}
+
 	/* for each discard range */
 	for (i = 0; i < nranges; i ++){
 		offset = dsm_range[i].slba << 9;
 		if (IS_MAIN_PARTITION(NO_PARTITION(offset / PAGE_SIZE)))
 			offset -= (START_OFS_IN_MAIN_PART * PAGE_SIZE);
+		//length = (dsm_range[i].nlb + 1) << 9; /* zero-based */
 		length = (dsm_range[i].nlb) << 9; /* zero-based */
 		remaining = length;
+		//NVMEV_INFO("[JWDBG] %s: ofs: %ld len: %ld, lpn: 0x%lx ~ 0x%lx\n", __func__, offset, length, offset/PAGE_SIZE, (offset+length-1)/PAGE_SIZE);
+
+
+		//printk("%s: slpn: 0x%lx len: %lu", 
+		//		__func__, offset/PAGE_SIZE, length/PAGE_SIZE);
+
+//#define BUF_CNT_ 50
+		
+//		if (1) {
+//		if	(((offset/PAGE_SIZE) >> 29) == 3) {
+//			glb_old_stack[glb_cnt] = offset/PAGE_SIZE;
+//			glb_new_stack[glb_cnt] = offset/PAGE_SIZE + length/PAGE_SIZE - 1;
+//			glb_cnt ++;
+//			if (glb_cnt == BUF_CNT_) {
+////#ifdef PLEASE
+//				printk("%s \n \
+//						slba: 0x%llx elba: 0x%llx \n \
+//						slba: 0x%llx elba: 0x%llx \n \
+//						slba: 0x%llx elba: 0x%llx \n \
+//						slba: 0x%llx elba: 0x%llx \n \
+//						slba: 0x%llx elba: 0x%llx \n \
+//						slba: 0x%llx elba: 0x%llx \n \
+//						slba: 0x%llx elba: 0x%llx \n \
+//						slba: 0x%llx elba: 0x%llx \n \
+//						slba: 0x%llx elba: 0x%llx \n \
+//						slba: 0x%llx elba: 0x%llx \n \
+//						", __func__,
+//						glb_old_stack[0], glb_new_stack[0],
+//						glb_old_stack[1], glb_new_stack[1],
+//						glb_old_stack[2], glb_new_stack[2],
+//						glb_old_stack[3], glb_new_stack[3],
+//						glb_old_stack[4], glb_new_stack[4],
+//						glb_old_stack[5], glb_new_stack[5],
+//						glb_old_stack[6], glb_new_stack[6],
+//						glb_old_stack[7], glb_new_stack[7],
+//						glb_old_stack[8], glb_new_stack[8],
+//						glb_old_stack[9], glb_new_stack[9]
+//				//		glb_old_stack[10], glb_new_stack[10],
+//				//		glb_old_stack[11], glb_new_stack[11],
+//				//		glb_old_stack[12], glb_new_stack[12],
+//				//		glb_old_stack[13], glb_new_stack[13],
+//				//		glb_old_stack[14], glb_new_stack[14],
+//				//		glb_old_stack[15], glb_new_stack[15],
+//				//		glb_old_stack[16], glb_new_stack[16],
+//				//		glb_old_stack[17], glb_new_stack[17],
+//				//		glb_old_stack[18], glb_new_stack[18],
+//				//		glb_old_stack[19], glb_new_stack[19]
+//					//	old_stack[20], new_stack[20],
+//					//	old_stack[21], new_stack[21],
+//					//	old_stack[22], new_stack[22],
+//					//	old_stack[23], new_stack[23],
+//					//	old_stack[24], new_stack[24],
+//					//	old_stack[25], new_stack[25],
+//					//	old_stack[26], new_stack[26],
+//					//	old_stack[27], new_stack[27],
+//					//	old_stack[28], new_stack[28],
+//					//	old_stack[29], new_stack[29],
+//					//	old_stack[30], new_stack[30],
+//					//	old_stack[31], new_stack[31],
+//					//	old_stack[32], new_stack[32],
+//					//	old_stack[33], new_stack[33],
+//					//	old_stack[34], new_stack[34],
+//					//	old_stack[35], new_stack[35],
+//					//	old_stack[36], new_stack[36],
+//					//	old_stack[37], new_stack[37],
+//					//	old_stack[38], new_stack[38],
+//					//	old_stack[39], new_stack[39],
+//					//	old_stack[40], new_stack[40],
+//					//	old_stack[41], new_stack[41],
+//					//	old_stack[42], new_stack[42],
+//					//	old_stack[43], new_stack[43],
+//					//	old_stack[44], new_stack[44],
+//					//	old_stack[45], new_stack[45],
+//					//	old_stack[46], new_stack[46],
+//					//	old_stack[47], new_stack[47],
+//					//	old_stack[48], new_stack[48],
+//					//	old_stack[49], new_stack[49]
+//				);
+////#endif
+//				glb_cnt = 0;
+//			}
+//		}
 
 		while (remaining) {
 			size_t io_size;
@@ -882,16 +1014,15 @@ static unsigned int __do_perform_io_dsm(struct nvmev_proc_table *pe)
 
 			/* JW: change paddr to offset. need to verify. */
 			if (offset & PAGE_OFFSET_MASK) { 
-				//NVMEV_ERROR("[JWDBG] %s: offset not aligned to PG. ofs: %lx len: %lx\n", __func__, 
-				//		offset, length);
+				NVMEV_ERROR("[JWDBG] %s: offset not aligned to PG. ofs: %lx len: %lx\n", __func__, 
+						offset, length);
 				mem_offs = offset & PAGE_OFFSET_MASK;
 				if (io_size + mem_offs > PAGE_SIZE)
 					io_size = PAGE_SIZE - mem_offs;
 			}
-			if (io_size != PAGE_SIZE) {
-			//	NVMEV_ERROR("[JWDBG] %s: iosize is not PGSIZE. iosize: %ld\n", __func__, 
-			//			io_size);
-			}
+			if (io_size != PAGE_SIZE)
+				NVMEV_ERROR("[JWDBG] %s: iosize is not PGSIZE. iosize: %ld\n", __func__, 
+						io_size);
 
 #ifdef MULTI_PARTITION_MTL
 			free_mem_addr(&vdev->ns[nsid], offset);//, tlist);
@@ -1069,8 +1200,43 @@ static void __enqueue_io_req(int sqid, int cqid, int sq_entry, unsigned long lon
 
 	//static unsigned long long order = 0;
 	pi->proc_table[entry].order = ret->order;
+	//order ++;
+
+	//if (order % 200 == 0)
+	//	printk("%s: order: %llu", __func__, order);
 
 #ifdef COUPLED_GC_MTL
+	/* convey mtl migration list to io kthread */
+	//struct list_elem *le;
+
+	/* TODO: optimize by just modifying and tail */	
+	//while(!list_empty_(&ret->mtl_migration_list)){
+	//	le = list_pop_front(&ret->mtl_migration_list);
+	//	list_push_back(&pi->proc_table[entry].mtl_migration_list, le);
+	//}
+	
+	//list_init(&pi->proc_table[entry].mtl_migration_list);
+
+	//if (!list_empty_(&ret->mtl_migration_list)) 
+	//	change_list(&ret->mtl_migration_list, &pi->proc_table[entry].mtl_migration_list);
+	//
+	//list_init(&ret->mtl_migration_list);
+	//
+	//pi->proc_table[entry].migration_cnt = ret->migration_cnt;
+	
+	/* convey mtl translation list to io kthread */
+	
+	//while(!list_empty_(&ret->mtl_translation_list)){
+	//	le = list_pop_front(&ret->mtl_translation_list);
+	//	list_push_back(&pi->proc_table[entry].mtl_translation_list, le);
+	//}
+	
+	//list_init(&pi->proc_table[entry].mtl_translation_list);
+	//
+	//if (!list_empty_(&ret->mtl_translation_list)) 
+	//	change_list(&ret->mtl_translation_list, &pi->proc_table[entry].mtl_translation_list);
+	//
+	//list_init(&ret->mtl_translation_list);
 
 	int i;
 	for (i = 0; i < SSD_PARTITIONS; i ++) {
@@ -1087,6 +1253,31 @@ static void __enqueue_io_req(int sqid, int cqid, int sq_entry, unsigned long lon
 
 #endif
 
+#ifdef MIGRATION_IO
+	/* convey mtl migration list to io kthread */
+	//list_init(&pi->proc_table[entry].mg_batch_list);
+	//pi->proc_table[entry].ise = NULL;
+
+	/* TODO: optimize by just modifying and tail */	
+	/*while(!list_empty_(&ret->mg_batch_list)){
+		le = list_pop_front(&ret->mg_batch_list);
+		list_push_back(&pi->proc_table[entry].mg_batch_list, le);
+	}*/
+	//pi->proc_table[entry].ise = ret->ise;
+
+	
+	//while(!list_empty_(&ret->ise_list)){
+	//	le = list_pop_front(&ret->ise_list);
+	//	list_push_back(&pi->proc_table[entry].ise_list, le);
+	//}
+
+	list_init(&pi->proc_table[entry].ise_list);
+	
+	if (!list_empty_(&ret->ise_list)) 
+		change_list(&ret->ise_list, &pi->proc_table[entry].ise_list);
+
+	list_init(&ret->ise_list);
+#endif
 
 	mb();	/* IO kthread shall see the updated pe at once */
 
@@ -1094,6 +1285,7 @@ static void __enqueue_io_req(int sqid, int cqid, int sq_entry, unsigned long lon
 	if (pi->io_seq == -1) {
 		pi->io_seq = entry;
 		pi->io_seq_end = entry;
+		//printk("%s: mola!!! order: %llu", __func__, order-1);
 	} else {
 		unsigned int curr = pi->io_seq_end;
 
@@ -1112,6 +1304,7 @@ static void __enqueue_io_req(int sqid, int cqid, int sq_entry, unsigned long lon
 			pi->proc_table[entry].next = pi->io_seq;
 			pi->io_seq = entry;
 			way_stack[ent_cnt] = 1;
+			printk("%s: NOWAY!!! 1", __func__);
 		} else if (pi->proc_table[curr].next == -1) { /* Tail */
 			pi->proc_table[entry].prev = curr;
 			pi->io_seq_end = entry;
